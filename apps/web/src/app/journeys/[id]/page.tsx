@@ -7,6 +7,19 @@ import { ShieldAlert, Activity, Zap, Clock, CheckCircle2, ArrowRight, XCircle, A
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+const readable = (value?: string | null) => {
+  if (!value) return "—";
+  const labels: Record<string, string> = {
+    PAYMENT_LINK: "Payment link",
+    ACTION_PENDING: "Action pending",
+    RECOVERY_WORKFLOW_INITIATED: "Recovery workflow initiated",
+    RAZORPAY_TEST_PAYMENT_LINK_CREATED: "Razorpay Test payment link created",
+    WAITING: "Waiting",
+    RAZORPAY_API: "Razorpay",
+  };
+  return labels[value] || value.replace(/_/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
+};
+
 export default function JourneyDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [data, setData] = useState<any>(null);
@@ -279,15 +292,15 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
                   }`}></div>
                   {i < audit_trail.length - 1 && <div className="w-px h-6 bg-slate-200"></div>}
                 </div>
-                <div className="flex-1 pb-2">
-                  <p className="text-sm font-medium text-[#02042B]">{a.event_type.replace(/_/g, ' ')}</p>
-                  <div className="flex gap-4 text-xs text-[#515978] mt-0.5">
+                <div className="flex-1 min-w-0 pb-3">
+                  <p className="text-sm font-semibold text-[#02042B]">{readable(a.event_type)}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[#515978]">
                     {a.timestamp && <span>{formatApiDate(a.timestamp)}</span>}
-                    <span>{a.actor_type}</span>
-                    {a.decision && <span>Decision: {a.decision}</span>}
-                    {a.reason && <span>Reason: {a.reason}</span>}
-                    {a.new_state && <span>→ {a.new_state}</span>}
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{readable(a.actor_type)}</span>
+                    {a.decision && <span><span className="text-[#8B94A7]">Action:</span> {readable(a.decision)}</span>}
+                    {a.new_state && <span className={`rounded-full px-2 py-0.5 font-semibold ${a.new_state === 'WAITING' ? 'bg-blue-50 text-blue-700' : a.new_state === 'ACTION_PENDING' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{readable(a.new_state)}</span>}
                   </div>
+                  {a.reason && <p className="mt-2 max-w-4xl text-sm leading-5 text-[#515978]">{readable(a.reason)}</p>}
                 </div>
               </div>
             ))}
