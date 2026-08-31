@@ -520,6 +520,7 @@ def dispatch_action(action_id: int, db: Session = Depends(get_db)):
     customer = db.query(Customer).filter(Customer.id == payment.customer_id).first() if payment and payment.customer_id else None
 
     provider_url = None
+    provider_created_at = None
     if action.action_type == "PAYMENT_LINK":
         if not payment:
             raise HTTPException(status_code=409, detail="Payment context is unavailable")
@@ -530,10 +531,12 @@ def dispatch_action(action_id: int, db: Session = Depends(get_db)):
         action.provider_reference = link["id"]
         action.status = "EXECUTING"
         provider_url = link.get("short_url")
+        provider_created_at = link.get("created_at")
     else:
         action.provider_reference = f"workflow_{action.id}_{int(datetime.utcnow().timestamp())}"
         action.status = "SCHEDULED"
-    action.executed_at = datetime.utcnow()
+    event_time = datetime.utcfromtimestamp(provider_created_at) if provider_created_at else datetime.utcnow()
+    action.executed_at = event_time
     if journey:
         journey.status = "WAITING"
         journey.attempt_count += 1
@@ -541,6 +544,7 @@ def dispatch_action(action_id: int, db: Session = Depends(get_db)):
         journey_id=action.journey_id, payment_id=journey.payment_id if journey else None,
         actor_type="SYSTEM", event_type="ACTION_DISPATCHED", decision=action.action_type,
         reason="RAZORPAY_TEST_PAYMENT_LINK_CREATED" if provider_url else "RECOVERY_WORKFLOW_SCHEDULED", new_state="WAITING",
+        timestamp=event_time,
     ))
     db.commit()
     if provider_url:
@@ -561,6 +565,10 @@ def reconcile_action(action_id: int, db: Session = Depends(get_db)):
     payment = db.query(Payment).filter(Payment.id == journey.payment_id).first() if journey else None
     if not journey or not payment:
         raise HTTPException(status_code=409, detail="Recovery context is unavailable")
+    if action.status == "FAILED":
+        return {"outcome": "failed", "journey_status": journey.status, "reason": action.failure_reason, "already_reconciled": True}
+    if journey.status == "RECOVERED":
+        return {"outcome": "recovered", "journey_status": journey.status, "already_reconciled": True}
 
     try:
         outcome = fetch_recovery_link_outcome(action.provider_reference)
@@ -858,7 +866,8 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
             failure_reason=failure_reason,
             failure_source=entity.get("error_source", "unknown"),
             failure_step=entity.get("error_step", "unknown"),
-            failure_category=normalize_failure(failure_detail, failure_code)
+            failure_category=normalize_failure(failure_detail, failure_code),
+            created_at=datetime.utcfromtimestamp(entity["created_at"]) if entity.get("created_at") else datetime.utcnow(),
         )
         db.add(payment)
         db.flush()

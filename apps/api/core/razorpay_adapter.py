@@ -36,7 +36,13 @@ def create_recovery_payment_link(action_id: int, payment, customer=None, payment
     except Exception as exc:
         raise RazorpayAdapterError(f"Razorpay payment link creation failed: {exc}") from exc
 
-    return {"id": link["id"], "short_url": link.get("short_url")}
+    return {
+        "id": link["id"],
+        "short_url": link.get("short_url"),
+        # Provider timestamp keeps the recovery timeline aligned with the
+        # payment attempt even if a local development machine clock drifts.
+        "created_at": link.get("created_at"),
+    }
 
 
 def fetch_recovery_link_outcome(link_id: str) -> dict:
