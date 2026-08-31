@@ -1,0 +1,151 @@
+{
+  "project": "CausalRecover",
+  "objective": "Estimate causal effect of recovery interventions on payment recovery",
+  "approach": "T-Learner (independent LightGBM model per treatment action)",
+  "dataset": "Semi-synthetic with heterogeneous treatment effects",
+  "dataset_label": "SYNTHETIC",
+  "dataset_size": 20000,
+  "train_size": 16000,
+  "test_size": 4000,
+  "features": [
+    "amount",
+    "failure_category_enc",
+    "payment_method_enc",
+    "issuer_category_enc",
+    "failure_source_enc",
+    "hour_of_day",
+    "day_of_week",
+    "customer_tenure_days",
+    "previous_attempts",
+    "historical_success_rate",
+    "historical_upi_success_rate",
+    "historical_card_success_rate",
+    "previous_failures",
+    "average_order_value",
+    "bank_health_score",
+    "is_repeat_customer",
+    "time_since_failure_minutes",
+    "previous_recovery_contacts",
+    "contact_consent",
+    "days_since_last_contact"
+  ],
+  "num_features": 20,
+  "actions": [
+    "ALTERNATIVE_PAYMENT_METHOD",
+    "CUSTOMER_NUDGE",
+    "NO_ACTION",
+    "PAYMENT_LINK",
+    "RETRY_LATER",
+    "UPDATE_PAYMENT_INSTRUMENT"
+  ],
+  "propensity_metrics": {
+    "ALTERNATIVE_PAYMENT_METHOD": {
+      "samples_train": 3249,
+      "samples_test": 793,
+      "roc_auc": 0.6094,
+      "pr_auc": 0.6241,
+      "brier_score": 0.2483,
+      "accuracy": 0.6003,
+      "mean_predicted_prob": 0.5397,
+      "actual_recovery_rate": 0.5473
+    },
+    "CUSTOMER_NUDGE": {
+      "samples_train": 2414,
+      "samples_test": 576,
+      "roc_auc": 0.59,
+      "pr_auc": 0.51,
+      "brier_score": 0.2502,
+      "accuracy": 0.5851,
+      "mean_predicted_prob": 0.4376,
+      "actual_recovery_rate": 0.4358
+    },
+    "NO_ACTION": {
+      "samples_train": 3226,
+      "samples_test": 796,
+      "roc_auc": 0.5095,
+      "pr_auc": 0.3697,
+      "brier_score": 0.2464,
+      "accuracy": 0.6168,
+      "mean_predicted_prob": 0.3362,
+      "actual_recovery_rate": 0.3505
+    },
+    "PAYMENT_LINK": {
+      "samples_train": 2338,
+      "samples_test": 599,
+      "roc_auc": 0.5881,
+      "pr_auc": 0.5546,
+      "brier_score": 0.2589,
+      "accuracy": 0.5743,
+      "mean_predicted_prob": 0.4874,
+      "actual_recovery_rate": 0.4908
+    },
+    "RETRY_LATER": {
+      "samples_train": 3152,
+      "samples_test": 841,
+      "roc_auc": 0.5918,
+      "pr_auc": 0.5666,
+      "brier_score": 0.2528,
+      "accuracy": 0.5767,
+      "mean_predicted_prob": 0.483,
+      "actual_recovery_rate": 0.4839
+    },
+    "UPDATE_PAYMENT_INSTRUMENT": {
+      "samples_train": 1621,
+      "samples_test": 395,
+      "roc_auc": 0.5653,
+      "pr_auc": 0.448,
+      "brier_score": 0.2557,
+      "accuracy": 0.5443,
+      "mean_predicted_prob": 0.4311,
+      "actual_recovery_rate": 0.4076
+    }
+  },
+  "uplift_metrics": {
+    "ALTERNATIVE_PAYMENT_METHOD": {
+      "mean_uplift": 0.1993,
+      "median_uplift": 0.2094,
+      "std_uplift": 0.2131,
+      "pct_positive_uplift": 0.8217,
+      "max_uplift": 0.8265
+    },
+    "CUSTOMER_NUDGE": {
+      "mean_uplift": 0.0905,
+      "median_uplift": 0.0907,
+      "std_uplift": 0.1941,
+      "pct_positive_uplift": 0.677,
+      "max_uplift": 0.7299
+    },
+    "PAYMENT_LINK": {
+      "mean_uplift": 0.1577,
+      "median_uplift": 0.1508,
+      "std_uplift": 0.2113,
+      "pct_positive_uplift": 0.7758,
+      "max_uplift": 0.7811
+    },
+    "RETRY_LATER": {
+      "mean_uplift": 0.1428,
+      "median_uplift": 0.1389,
+      "std_uplift": 0.1996,
+      "pct_positive_uplift": 0.7665,
+      "max_uplift": 0.7553
+    },
+    "UPDATE_PAYMENT_INSTRUMENT": {
+      "mean_uplift": 0.1003,
+      "median_uplift": 0.088,
+      "std_uplift": 0.215,
+      "pct_positive_uplift": 0.6617,
+      "max_uplift": 0.8258
+    }
+  },
+  "known_limitations": [
+    "Model trained on semi-synthetic data, not real merchant transactions",
+    "Treatment effects are simulated with known DGP, not observed from production",
+    "Should NOT be interpreted as proven production uplift",
+    "Feature set is limited compared to production requirements",
+    "No temporal validation (time-based splits not implemented)"
+  ],
+  "prohibited_interpretation": [
+    "Do not present synthetic evaluation metrics as production accuracy",
+    "Do not claim incremental recovery numbers as real financial impact"
+  ]
+}
