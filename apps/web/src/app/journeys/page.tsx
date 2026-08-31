@@ -31,6 +31,7 @@ const readable = (value?: string | null) => {
 const displayFailure = (journey: any) => {
   const reason = (journey.failure_reason || "").toLowerCase();
   if (reason.includes("declined by the bank")) return "Bank declined";
+  if (reason.includes("payment_cancelled")) return "Payment cancelled";
   if (journey.failure_category && journey.failure_category !== "UNKNOWN") return readable(journey.failure_category);
   if (journey.failure_code) return readable(journey.failure_code);
   return "Needs classification";
@@ -56,7 +57,7 @@ export default function JourneysList() {
         </div>
         <select value={filter} onChange={e => setFilter(e.target.value)} className="px-3 py-2 border border-[#E4E6EA] rounded-lg text-sm bg-white text-[#02042B]">
           <option value="">All Statuses</option>
-          {statuses.filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}
+          {statuses.filter(Boolean).map(s => <option key={s} value={s}>{readable(s)}</option>)}
         </select>
       </div>
 
@@ -82,9 +83,9 @@ export default function JourneysList() {
                 <td className="px-5 py-3 font-mono text-xs text-[#02042B]">{j.payment_id}</td>
                 <td className="px-5 py-3 text-xs text-[#515978]">{j.customer_id || '—'}</td>
                 <td className="px-5 py-3 font-semibold text-[#02042B]">₹{j.amount_at_risk?.toLocaleString('en-IN')}</td>
-                <td className="px-5 py-3"><span className="text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded">{displayFailure(j)}</span></td>
-                <td className="px-5 py-3 text-xs font-medium text-[#02042B]">{readable(j.selected_action)}</td>
-                <td className="px-5 py-3 text-xs font-semibold">{j.selected_net_value > 0 ? <span className="text-green-600">₹{j.selected_net_value?.toLocaleString('en-IN')}</span> : '—'}</td>
+                <td className="px-5 py-3"><span className="inline-flex whitespace-nowrap text-xs bg-red-50 text-red-700 px-2 py-1 rounded-md">{displayFailure(j)}</span></td>
+                <td className="px-5 py-3 text-xs font-medium text-[#02042B] whitespace-nowrap">{readable(j.selected_action)}</td>
+                <td className="px-5 py-3 text-xs font-semibold whitespace-nowrap">{j.selected_net_value > 0 ? <span className="text-green-600">₹{j.selected_net_value?.toLocaleString('en-IN')}</span> : '—'}</td>
                 <td className="px-5 py-3 text-xs text-[#515978]">{readable(j.resolution)}</td>
                 <td className="px-5 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -92,7 +93,7 @@ export default function JourneysList() {
                     j.status === 'STOPPED' ? 'bg-red-100 text-red-700' :
                     j.status === 'ESCALATED' ? 'bg-amber-100 text-amber-700' :
                     'bg-blue-100 text-blue-700'
-                  }`}>{j.status}</span>
+                  } whitespace-nowrap`}>{readable(j.status)}</span>
                 </td>
               </tr>
             ))}
