@@ -387,6 +387,17 @@ def get_journeys(
         selected = db.query(ActionCandidate).filter(
             ActionCandidate.journey_id == j.id, ActionCandidate.is_selected == True
         ).first()
+        # Webhook/manual recovery flows can create an executable RecoveryAction
+        # without a persisted model candidate. Show that real action rather than
+        # incorrectly implying that no action was selected.
+        dispatched_action = db.query(RecoveryAction).filter(
+            RecoveryAction.journey_id == j.id
+        ).order_by(desc(RecoveryAction.created_at)).first()
+        selected_action = selected.action_type if selected else (dispatched_action.action_type if dispatched_action else None)
+        selected_net_value = (
+            selected.net_incremental_value if selected
+            else (dispatched_action.estimated_value if dispatched_action else None)
+        )
         results.append({
             "id": j.id,
             "payment_id": j.payment_id,
@@ -399,10 +410,12 @@ def get_journeys(
             "started_at": j.started_at.isoformat() if j.started_at else None,
             "resolved_at": j.resolved_at.isoformat() if j.resolved_at else None,
             "failure_category": payment.failure_category if payment else None,
+            "failure_code": payment.failure_code if payment else None,
+            "failure_reason": payment.failure_reason if payment else None,
             "method": payment.method if payment else None,
-            "selected_action": selected.action_type if selected else None,
+            "selected_action": selected_action,
             "selected_uplift": round(selected.uplift, 4) if selected else None,
-            "selected_net_value": round(selected.net_incremental_value, 2) if selected else None,
+            "selected_net_value": round(selected_net_value, 2) if selected_net_value is not None else None,
         })
     
     return {"total": total, "journeys": results}
