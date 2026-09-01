@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { ArrowRight, Activity, GitBranch } from "lucide-react";
+import { ArrowRight, Activity, GitBranch, ShieldCheck, CircleDollarSign, CheckCircle2, Webhook, ArrowDown } from "lucide-react";
 
 export default function LandingPage() {
   return (
@@ -155,6 +155,49 @@ export default function LandingPage() {
             </div>
           </div>
 
+        </div>
+      </section>
+
+      {/* ─── PRODUCT FLOW ─── */}
+      <section id="engine" className="relative z-10 mx-auto max-w-6xl px-6 py-20">
+        <div className="mx-auto mb-12 max-w-2xl text-center">
+          <p className="text-xs font-extrabold uppercase tracking-widest text-[#3366FF]">Recovery engine</p>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[#02042B] md:text-4xl">From payment failure to verified outcome.</h2>
+          <p className="mt-4 text-base font-medium leading-relaxed text-[#515978]">Every decision is measurable, policy-bound, and visible to the merchant.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          {[
+            { step: "01", title: "Detect", text: "Razorpay webhook captures a failed payment and its provider reason.", icon: Webhook },
+            { step: "02", title: "Decide", text: "AI compares no action with recovery options using net incremental value.", icon: Activity },
+            { step: "03", title: "Approve", text: "Merchant policies and the Action Queue keep every workflow bounded.", icon: ShieldCheck },
+            { step: "04", title: "Verify", text: "Razorpay Test Mode outcomes update the journey and immutable audit timeline.", icon: CheckCircle2 },
+          ].map((item, index) => { const Icon = item.icon; return <div key={item.step} className="relative rounded-2xl border border-[#E4E6EA] bg-white p-6 shadow-sm"><div className="mb-8 flex items-center justify-between"><span className="text-xs font-extrabold text-[#3366FF]">{item.step}</span><Icon className="h-5 w-5 text-[#3366FF]" /></div><h3 className="text-lg font-extrabold text-[#02042B]">{item.title}</h3><p className="mt-2 text-sm font-medium leading-relaxed text-[#515978]">{item.text}</p>{index < 3 && <ArrowRight className="absolute -right-7 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 text-[#3366FF] md:block" />}</div>})}
+        </div>
+      </section>
+
+      {/* ─── TRUST / METRICS ─── */}
+      <section id="metrics" className="relative z-10 mx-auto max-w-6xl px-6 py-20">
+        <div className="overflow-hidden rounded-[28px] bg-[#02042B] px-8 py-12 shadow-2xl md:px-12">
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-widest text-[#00D27A]">Honest measurement</p>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-white md:text-4xl">Recovered money and AI estimates are never mixed.</h2>
+              <p className="mt-4 max-w-lg text-base font-medium leading-relaxed text-slate-300">CausalRecover separates verified recovery, model-estimated incremental value, intervention cost, and experimental evidence—so a better-looking conversion rate never becomes a misleading revenue claim.</p>
+              <Link href="/experiments" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-[#00D27A] hover:text-white">See the evidence gate <ArrowRight className="h-4 w-4" /></Link>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[{ title: "Verified recovery", text: "Webhook-confirmed payment outcomes", icon: CheckCircle2 }, { title: "Expected net value", text: "Uplift × amount − action cost", icon: CircleDollarSign }, { title: "Control baseline", text: "No action is a measurable valid choice", icon: Activity }, { title: "Guardrailed execution", text: "Policy and merchant approval before dispatch", icon: ShieldCheck }].map(metric => { const Icon = metric.icon; return <div key={metric.title} className="rounded-xl border border-white/10 bg-white/5 p-4"><Icon className="h-5 w-5 text-[#00D27A]" /><p className="mt-4 text-sm font-bold text-white">{metric.title}</p><p className="mt-1 text-xs leading-relaxed text-slate-400">{metric.text}</p></div>})}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 mx-auto max-w-4xl px-6 py-16 text-center">
+        <div className="rounded-[28px] border border-[#3366FF]/20 bg-[#3366FF]/5 px-8 py-12">
+          <p className="text-xs font-extrabold uppercase tracking-widest text-[#3366FF]">Ready for the walkthrough</p>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[#02042B]">See one failed payment become an auditable recovery journey.</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-sm font-medium leading-relaxed text-[#515978]">Razorpay Test Mode is connected. Start with at-risk payments, review the AI decision, then approve and dispatch the bounded workflow.</p>
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><Link href="/at-risk" className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3366FF] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-[#2852cc]">Open recovery workspace <ArrowRight className="h-4 w-4" /></Link><Link href="/actions" className="inline-flex items-center justify-center gap-2 rounded-full border border-[#E4E6EA] bg-white px-6 py-3 text-sm font-bold text-[#02042B] hover:border-[#3366FF]">Review Action Queue <ArrowDown className="h-4 w-4" /></Link></div>
         </div>
       </section>
 
