@@ -147,6 +147,23 @@ class Experiment(Base):
     started_at = Column(DateTime, default=datetime.utcnow)
     ended_at = Column(DateTime, nullable=True)
 
+# Each newly evaluated payment is assigned before execution. Keeping the arm at
+# journey level makes treatment-vs-control measurement reproducible and avoids
+# treating an outcome as causal without an explicit baseline.
+class ExperimentAssignment(Base):
+    __tablename__ = "experiment_assignments"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    experiment_id = Column(Integer, ForeignKey("experiments.id"), nullable=False, index=True)
+    journey_id = Column(Integer, ForeignKey("recovery_journeys.id"), nullable=False, unique=True, index=True)
+    payment_id = Column(String, ForeignKey("payments.id"), nullable=False, index=True)
+    arm = Column(String, nullable=False)  # CONTROL or TREATMENT
+    selected_action = Column(String, nullable=False)
+    source_mode = Column(String, default="TEST")  # TEST or LIVE
+    outcome = Column(String, nullable=True)  # RECOVERED, CANCELLED, EXPIRED
+    recovered_amount = Column(Float, default=0.0)
+    assigned_at = Column(DateTime, default=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+
 # ─── WEBHOOK EVENTS ───
 class WebhookEvent(Base):
     __tablename__ = "webhook_events"

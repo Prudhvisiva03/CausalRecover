@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from database.models import (
     init_db, get_db, Customer, Payment, RecoveryJourney, ActionCandidate,
-    RecoveryAction, AuditEvent, Experiment, WebhookEvent, MerchantPolicy
+    RecoveryAction, AuditEvent, Experiment, ExperimentAssignment, WebhookEvent, MerchantPolicy
 )
 from core.economic_optimizer import evaluate_transaction
 from core.policy_engine import evaluate_policies
@@ -63,6 +63,12 @@ def customer_context(customer: Customer | None, payment: Payment, journey: Recov
     }
 
 
+def experiment_arm(experiment: Experiment, payment_id: str) -> str:
+    """Stable  allocation: retries never move a payment between experiment arms."""
+    bucket = int(hashlib.sha256(f"{experiment.id}:{payment_id}".encode()).hexdigest()[:8], 16) % 10000
+    return "CONTROL" if bucket < int(experiment.control_percentage * 100) else "TREATMENT"
+
+
 def evaluate_and_queue_recovery(db: Session, payment: Payment, journey: RecoveryJourney, customer: Customer | None):
     """Evaluate all actions, persist the decision, and queue only a bounded action."""
     candidates = evaluate_transaction(
@@ -90,6 +96,18 @@ def evaluate_and_queue_recovery(db: Session, payment: Payment, journey: Recovery
             selected = db_candidate
         db.add(db_candidate)
 
+    active_experiment = db.query(Experiment).filter(Experiment.status == "ACTIVE").order_by(Experiment.id).first()
+    assigned_arm = experiment_arm(active_experiment, payment.id) if active_experiment else None
+
+    # A control assignment deliberately takes no action. This is the only
+    # defensible baseline for measuring incremental recovery later.
+    if assigned_arm == "CONTROL" and no_action_record:
+        if selected:
+            selected.is_selected = False
+        selected = no_action_record
+        selected.is_selected = True
+        selected.policy_reason = "EXPERIMENT_CONTROL_BASELINE"
+
     if selected is None:
         # NO_ACTION is a deliberate, auditable choice—not an error state.
         selected = no_action_record
@@ -106,11 +124,15 @@ def evaluate_and_queue_recovery(db: Session, payment: Payment, journey: Recovery
         journey.status = "WAITING"
         journey.resolution = "NATURAL_RECOVERY_MONITORING"
     else:
-        journey.status = "ACTION_PENDING"
-        db.add(RecoveryAction(
-            journey_id=journey.id, action_type=selected.action_type, status="PENDING",
-            estimated_value=selected.net_incremental_value,
-        ))
+        if assigned_arm == "CONTROL":
+            journey.status = "WAITING"
+            journey.resolution = "EXPERIMENT_CONTROL_BASELINE"
+        else:
+            journey.status = "ACTION_PENDING"
+            db.add(RecoveryAction(
+                journey_id=journey.id, action_type=selected.action_type, status="PENDING",
+                estimated_value=selected.net_incremental_value,
+            ))
 
     no_action = next((c for c in candidates if c["action_type"] == "NO_ACTION"), None)
     payment.natural_recovery_prob = no_action["probability"] if no_action else 0
@@ -123,6 +145,16 @@ def evaluate_and_queue_recovery(db: Session, payment: Payment, journey: Recovery
         estimated_uplift=selected.uplift, estimated_incremental_value=selected.net_incremental_value,
         new_state=journey.status,
     ))
+    if active_experiment and assigned_arm:
+        source_mode = os.getenv("RAZORPAY_MODE", "TEST").upper()
+        db.add(ExperimentAssignment(
+            experiment_id=active_experiment.id, journey_id=journey.id, payment_id=payment.id,
+            arm=assigned_arm, selected_action=selected.action_type, source_mode=source_mode,
+        ))
+        db.add(AuditEvent(
+            journey_id=journey.id, payment_id=payment.id, actor_type="SYSTEM", event_type="EXPERIMENT_ASSIGNED",
+            decision=assigned_arm, reason=f"{source_mode}_MODE_{assigned_arm}_ASSIGNMENT", new_state=journey.status,
+        ))
     return selected
 
 
@@ -155,6 +187,10 @@ def mark_recovery_completed(db: Session, payment: Payment, journey: RecoveryJour
         RecoveryAction.journey_id == journey.id,
         RecoveryAction.status.in_(["PENDING", "APPROVED", "SCHEDULED", "EXECUTING"]),
     ).update({"status": "COMPLETED", "executed_at": datetime.utcnow()})
+    db.query(ExperimentAssignment).filter(
+        ExperimentAssignment.journey_id == journey.id,
+        ExperimentAssignment.outcome.is_(None),
+    ).update({"outcome": "RECOVERED", "recovered_amount": payment.amount, "resolved_at": datetime.utcnow()})
     db.add(AuditEvent(
         journey_id=journey.id, payment_id=payment.id, actor_type="WEBHOOK", event_type="PAYMENT_RECOVERED",
         reason=source, new_state="RECOVERED",
@@ -689,9 +725,39 @@ def get_experiments(db: Session = Depends(get_db)):
             "control_recovery_rate": round(control_rate, 4),
             "observed_lift_pp": round((treatment_rate - control_rate) * 100, 2),
             "measurement_label": "EXPERIMENTAL MEASUREMENT — benchmarked against a control baseline",
+            "data_source": "OFFLINE_SEEDED_BENCHMARK",
             "started_at": e.started_at.isoformat() if e.started_at else None,
         })
     return {"experiments": results}
+
+
+@app.get("/api/experiments/evidence")
+def get_experiment_evidence(db: Session = Depends(get_db)):
+    """Report only live, randomized outcomes as production-evidence candidates."""
+    minimum_per_arm = int(os.getenv("CAUSAL_EVIDENCE_MIN_PER_ARM", "30"))
+    assignments = db.query(ExperimentAssignment).all()
+    live = [a for a in assignments if a.source_mode == "LIVE"]
+    test = [a for a in assignments if a.source_mode != "LIVE"]
+
+    def arm_summary(rows, arm):
+        arm_rows = [a for a in rows if a.arm == arm]
+        recovered = [a for a in arm_rows if a.outcome == "RECOVERED"]
+        return {"assigned": len(arm_rows), "recovered": len(recovered), "recovered_amount": round(sum(a.recovered_amount or 0 for a in recovered), 2)}
+
+    control = arm_summary(live, "CONTROL")
+    treatment = arm_summary(live, "TREATMENT")
+    ready = control["assigned"] >= minimum_per_arm and treatment["assigned"] >= minimum_per_arm
+    return {
+        "source_mode": os.getenv("RAZORPAY_MODE", "TEST").upper(),
+        "live_assignments": len(live),
+        "test_assignments": len(test),
+        "control": control,
+        "treatment": treatment,
+        "minimum_per_arm": minimum_per_arm,
+        "ready_for_effect_evaluation": ready,
+        "claim_status": "READY_FOR_CONFIDENCE_INTERVAL_EVALUATION" if ready else "COLLECTING_LIVE_RANDOMIZED_OUTCOMES",
+        "message": "Live randomized outcomes are required before estimating merchant impact. Test Mode outcomes remain operational verification only.",
+    }
 
 # ══════════════════════════════════════════════════════════════
 # POLICIES

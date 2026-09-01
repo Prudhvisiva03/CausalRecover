@@ -6,9 +6,11 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function ExperimentsPage() {
   const [experiments, setExperiments] = useState<any[]>([]);
+  const [evidence, setEvidence] = useState<any>(null);
 
   useEffect(() => {
     fetch(`${API}/api/experiments`).then(r => r.json()).then(r => setExperiments(r.experiments || [])).catch(() => {});
+    fetch(`${API}/api/experiments/evidence`).then(r => r.json()).then(setEvidence).catch(() => {});
   }, []);
 
   return (
@@ -17,6 +19,24 @@ export default function ExperimentsPage() {
         <h2 className="text-2xl font-bold text-[#02042B]">Experiments</h2>
         <p className="text-[#515978] mt-1">Treatment vs Control measurement. Gross recovery ≠ incremental recovery.</p>
       </div>
+
+      {evidence && (
+        <section className={`rounded-xl border p-5 ${evidence.ready_for_effect_evaluation ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className={`text-xs font-bold uppercase tracking-wider ${evidence.ready_for_effect_evaluation ? "text-emerald-700" : "text-amber-700"}`}>Causal evidence gate</p>
+              <h3 className="mt-1 text-lg font-bold text-[#02042B]">{evidence.ready_for_effect_evaluation ? "Ready for confidence-interval evaluation" : "Collecting live randomized outcomes"}</h3>
+              <p className="mt-1 max-w-3xl text-sm text-[#515978]">{evidence.message}</p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#515978] shadow-sm">Provider mode: {evidence.source_mode}</span>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-white/80 p-3"><p className="text-xs text-[#515978]">Live treatment assignments</p><p className="mt-1 text-xl font-bold text-[#02042B]">{evidence.treatment?.assigned || 0} <span className="text-sm font-medium">/ {evidence.minimum_per_arm}</span></p></div>
+            <div className="rounded-lg bg-white/80 p-3"><p className="text-xs text-[#515978]">Live control assignments</p><p className="mt-1 text-xl font-bold text-[#02042B]">{evidence.control?.assigned || 0} <span className="text-sm font-medium">/ {evidence.minimum_per_arm}</span></p></div>
+            <div className="rounded-lg bg-white/80 p-3"><p className="text-xs text-[#515978]">Test Mode assignments</p><p className="mt-1 text-xl font-bold text-[#02042B]">{evidence.test_assignments || 0}</p></div>
+          </div>
+        </section>
+      )}
 
       {experiments.map((exp: any) => {
         const treatmentRate = ((exp.treatment_recovery_rate ?? 0) * 100).toFixed(1);
@@ -36,7 +56,7 @@ export default function ExperimentsPage() {
                   <h3 className="text-lg font-bold text-[#02042B]">{exp.name}</h3>
                   <p className="text-sm text-[#515978] mt-1">{exp.description}</p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${exp.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-[#F4F5F8] text-[#515978]'}`}>{exp.status}</span>
+                <div className="flex flex-wrap justify-end gap-2"><span className="px-3 py-1 rounded-full bg-slate-100 text-xs font-bold text-slate-600">Offline benchmark</span><span className={`px-3 py-1 rounded-full text-xs font-bold ${exp.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-[#F4F5F8] text-[#515978]'}`}>{exp.status}</span></div>
               </div>
             </div>
 
