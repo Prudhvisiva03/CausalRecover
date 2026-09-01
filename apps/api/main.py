@@ -491,6 +491,8 @@ def get_actions(
             "customer_id": journey.customer_id if journey else None,
             "amount": payment.amount if payment else None,
             "payment_id": journey.payment_id if journey else None,
+            "provider_reference": a.provider_reference,
+            "failure_reason": a.failure_reason,
             "scheduled_at": a.scheduled_at.isoformat() if a.scheduled_at else None,
             "executed_at": a.executed_at.isoformat() if a.executed_at else None,
             "created_at": a.created_at.isoformat() if a.created_at else None,
@@ -503,8 +505,15 @@ def approve_action(action_id: int, db: Session = Depends(get_db)):
     action = db.query(RecoveryAction).filter(RecoveryAction.id == action_id).first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
+    if action.status != "PENDING":
+        raise HTTPException(status_code=409, detail=f"Only pending actions can be approved (current: {action.status})")
     action.status = "APPROVED"
-    db.add(AuditEvent(journey_id=action.journey_id, actor_type="MERCHANT", event_type="ACTION_APPROVED", decision=action.action_type, reason="MERCHANT_APPROVAL", new_state="APPROVED"))
+    journey = db.query(RecoveryJourney).filter(RecoveryJourney.id == action.journey_id).first()
+    db.add(AuditEvent(
+        journey_id=action.journey_id, payment_id=journey.payment_id if journey else None,
+        actor_type="MERCHANT", event_type="ACTION_APPROVED", decision=action.action_type,
+        reason="MERCHANT_APPROVAL", previous_state="PENDING", new_state="APPROVED"
+    ))
     db.commit()
     return {"status": "approved", "action_id": action_id}
 
@@ -513,8 +522,20 @@ def cancel_action(action_id: int, db: Session = Depends(get_db)):
     action = db.query(RecoveryAction).filter(RecoveryAction.id == action_id).first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
+    if action.status not in {"PENDING", "APPROVED", "SCHEDULED"}:
+        raise HTTPException(status_code=409, detail=f"Action cannot be cancelled from {action.status}")
+    previous_status = action.status
     action.status = "CANCELLED"
-    db.add(AuditEvent(journey_id=action.journey_id, actor_type="MERCHANT", event_type="ACTION_CANCELLED", decision=action.action_type, reason="MERCHANT_CANCELLED", new_state="CANCELLED"))
+    journey = db.query(RecoveryJourney).filter(RecoveryJourney.id == action.journey_id).first()
+    if journey:
+        journey.status = "STOPPED"
+        journey.resolution = "MERCHANT_CANCELLED"
+        journey.resolved_at = datetime.utcnow()
+    db.add(AuditEvent(
+        journey_id=action.journey_id, payment_id=journey.payment_id if journey else None,
+        actor_type="MERCHANT", event_type="ACTION_CANCELLED", decision=action.action_type,
+        reason="MERCHANT_CANCELLED", previous_state=previous_status, new_state="STOPPED"
+    ))
     db.commit()
     return {"status": "cancelled", "action_id": action_id}
 
@@ -525,7 +546,7 @@ def dispatch_action(action_id: int, db: Session = Depends(get_db)):
     action = db.query(RecoveryAction).filter(RecoveryAction.id == action_id).first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
-    if action.status not in {"PENDING", "APPROVED"}:
+    if action.status != "APPROVED":
         raise HTTPException(status_code=409, detail=f"Action cannot be dispatched from {action.status}")
 
     journey = db.query(RecoveryJourney).filter(RecoveryJourney.id == action.journey_id).first()

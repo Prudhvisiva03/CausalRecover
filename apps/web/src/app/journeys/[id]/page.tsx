@@ -251,11 +251,12 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">{action.status}</span>
-                  {["PENDING", "APPROVED"].includes(action.status) && (
+                  {action.status === "APPROVED" && (
                     <button onClick={() => dispatchSandbox(action.id)} disabled={dispatching === action.id} className="rounded-lg bg-[#3366FF] px-3 py-2 text-xs font-bold text-white hover:bg-[#2852cc] disabled:bg-blue-300">
                       {dispatching === action.id ? "Dispatching…" : "Dispatch action"}
                     </button>
                   )}
+                  {action.status === "PENDING" && <Link href="/actions" className="rounded-lg border border-[#3366FF] px-3 py-2 text-xs font-bold text-[#3366FF] hover:bg-blue-50">Review in Action Queue</Link>}
                   {action.action_type === "PAYMENT_LINK" && ["EXECUTING", "FAILED"].includes(action.status) && (
                     <button onClick={() => reconcileRazorpay(action.id)} disabled={reconciling === action.id} className="rounded-lg border border-[#3366FF] px-3 py-2 text-xs font-bold text-[#3366FF] hover:bg-blue-50 disabled:opacity-50">
                       {reconciling === action.id ? "Verifying…" : "Verify Razorpay status"}

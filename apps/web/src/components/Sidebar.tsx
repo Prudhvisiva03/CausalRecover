@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, AlertCircle, TrendingUp, Activity, ShieldCheck, BarChart3, ScrollText, FlaskConical, Brain, Plug } from "lucide-react";
+import { LayoutDashboard, AlertCircle, TrendingUp, Activity, ShieldCheck, BarChart3, ScrollText, FlaskConical, Brain, Plug, ListChecks } from "lucide-react";
 
 const menu = [
   { label: "CORE", items: [
@@ -17,6 +17,7 @@ const menu = [
     { name: "Models", href: "/models", icon: Brain },
   ]},
   { label: "OPERATIONS", items: [
+    { name: "Action Queue", href: "/actions", icon: ListChecks },
     { name: "Audit Trail", href: "/audit", icon: ScrollText },
   ]},
   { label: "ANALYTICS", items: [
