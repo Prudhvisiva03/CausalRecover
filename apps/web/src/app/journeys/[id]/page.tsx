@@ -14,8 +14,24 @@ const readable = (value?: string | null) => {
     ACTION_PENDING: "Action pending",
     RECOVERY_WORKFLOW_INITIATED: "Recovery workflow initiated",
     RAZORPAY_TEST_PAYMENT_LINK_CREATED: "Razorpay Test payment link created",
+    RAZORPAY_API_RECONCILIATION: "Verified through Razorpay API reconciliation",
+    TEST_MODE_RECOVERY_WORKFLOW_REQUESTED: "Test Mode recovery workflow requested",
+    MERCHANT_APPROVAL: "Approved by merchant",
+    PAYMENT_FAILED: "Original payment failed",
+    ACTION_APPROVED: "Recovery action approved",
+    ACTION_DISPATCHED: "Recovery action dispatched",
+    PAYMENT_RECOVERED: "Recovery payment completed",
+    RECOVERED: "Recovered",
+    COMPLETED: "Completed",
+    APPROVED: "Approved",
+    PENDING: "Pending review",
+    EXECUTING: "Executing",
+    FAILED: "Failed",
     WAITING: "Waiting",
     RAZORPAY_API: "Razorpay",
+    MERCHANT: "Merchant",
+    SYSTEM: "System",
+    WEBHOOK: "Webhook",
   };
   return labels[value] || value.replace(/_/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
 };
@@ -47,6 +63,8 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
   const { payment, customer, journey, candidates, audit_trail } = data;
   const selected = candidates?.find((c: any) => c.is_selected);
   const noAction = candidates?.find((c: any) => c.action_type === "NO_ACTION");
+  const isRecovered = journey?.status === "RECOVERED" || payment.status === "recovered";
+  const isTestModeRecovery = journey?.resolution === "RAZORPAY_API_RECONCILIATION" || payment.failure_code?.startsWith("TEST_MODE_");
 
   const dispatchSandbox = async (actionId: number) => {
     setDispatching(actionId);
@@ -100,22 +118,38 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
               {journey?.status || payment.status}
             </span>
           </h2>
-          <p className="text-[#515978] mt-1">Customer: {payment.customer_id} • Order: {payment.order_id}</p>
+          <p className="text-[#515978] mt-1">Customer: {payment.customer_id}{payment.order_id ? ` • Order: ${payment.order_id}` : ""}</p>
         </div>
       </div>
+
+      {isRecovered && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" />
+            <div>
+              <p className="font-bold text-emerald-950">₹{journey?.recovered_amount?.toLocaleString("en-IN")} recovery verified</p>
+              <p className="mt-1 text-sm leading-5 text-emerald-800">
+                The recovery payment completed and was verified through Razorpay API reconciliation{journey?.resolved_at ? ` on ${formatApiDate(journey.resolved_at)}` : ""}.
+                {isTestModeRecovery && " This is a Razorpay Test Mode verification, not a live settlement."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* A. Failure Diagnosis */}
         <div className="bg-white p-6 rounded-xl border border-[#E4E6EA] shadow-sm col-span-2">
           <h3 className="text-base font-bold text-[#02042B] mb-4 flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-red-500" />
-            Failure Diagnosis
+            <ShieldAlert className={`w-5 h-5 ${isRecovered ? "text-amber-500" : "text-red-500"}`} />
+            {isRecovered ? "Original Payment Failure" : "Failure Diagnosis"}
           </h3>
+          {isRecovered && <p className="-mt-2 mb-4 text-sm text-[#515978]">This is the original failure that started the journey; the recovery outcome is confirmed above.</p>}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div><p className="text-[#515978] mb-1">Provider</p><p className="font-semibold text-[#02042B]">Razorpay</p></div>
-            <div><p className="text-[#515978] mb-1">Normalized Failure</p><p className="font-semibold text-red-600">{payment.failure_category}</p></div>
-            <div><p className="text-[#515978] mb-1">Source → Step</p><p className="font-semibold text-[#02042B]">{payment.failure_source} → {payment.failure_step}</p></div>
-            <div><p className="text-[#515978] mb-1">Reason</p><p className="text-[#02042B]">{payment.failure_reason}</p></div>
+            <div><p className="text-[#515978] mb-1">{isRecovered ? "Original failure type" : "Normalized Failure"}</p><p className={`font-semibold ${isRecovered ? "text-amber-700" : "text-red-600"}`}>{readable(payment.failure_category)}</p></div>
+            <div><p className="text-[#515978] mb-1">Source → Step</p><p className="font-semibold text-[#02042B]">{readable(payment.failure_source)} → {readable(payment.failure_step)}</p></div>
+            <div><p className="text-[#515978] mb-1">Initial failure reason</p><p className="text-[#02042B]">{payment.failure_reason}</p></div>
             <div><p className="text-[#515978] mb-1">Payment Method</p><p className="font-semibold text-[#02042B] uppercase">{payment.method}</p></div>
             <div><p className="text-[#515978] mb-1">Initial failure recorded</p><p className="font-semibold text-[#02042B]">{formatApiDate(payment.created_at)}</p><p className="mt-1 text-xs text-[#8B94A7]">Provider checkout outcomes appear in the event timeline.</p></div>
           </div>
@@ -128,6 +162,11 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
             Risk Assessment
           </h3>
           <div className="space-y-4">
+            {candidates?.length === 0 && isTestModeRecovery ? (
+              <div className="rounded-lg bg-slate-50 p-3 text-sm leading-5 text-[#515978]">
+                This Test Mode workflow was manually approved for verification. No model estimate was generated, so no recovery probability is being claimed.
+              </div>
+            ) : (
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-[#515978]">Natural Recovery Probability</span>
@@ -137,6 +176,7 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
                 <div className="bg-indigo-500 h-2.5 rounded-full transition-all" style={{ width: `${(noAction?.probability || 0) * 100}%` }}></div>
               </div>
             </div>
+            )}
             {customer && (
               <>
                 <div className="pt-3 border-t border-[#E4E6EA]/50 text-sm">
@@ -246,11 +286,14 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
             {data.actions.map((action: any) => (
               <div key={action.id} className="rounded-lg border border-[#E4E6EA] p-4 flex flex-wrap gap-4 items-center justify-between">
                 <div>
-                  <p className="text-sm font-bold text-[#02042B]">{action.action_type.replace(/_/g, " ")}</p>
-                  <p className="text-xs text-[#515978] mt-1">Expected net incremental value: ₹{action.estimated_value?.toLocaleString("en-IN")}</p>
+                  <p className="text-sm font-bold text-[#02042B]">{readable(action.action_type)}</p>
+                  <p className="text-xs text-[#515978] mt-1">
+                    {candidates?.length > 0 ? `Expected net incremental value: ₹${action.estimated_value?.toLocaleString("en-IN")}` : "Merchant-approved Test Mode recovery workflow"}
+                  </p>
+                  {action.status === "COMPLETED" && isRecovered && <p className="mt-1 text-xs font-semibold text-emerald-700">Verified recovered: ₹{journey?.recovered_amount?.toLocaleString("en-IN")}</p>}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">{action.status}</span>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${action.status === "COMPLETED" ? "bg-emerald-100 text-emerald-700" : action.status === "FAILED" ? "bg-red-100 text-red-700" : "bg-blue-50 text-blue-700"}`}>{readable(action.status)}</span>
                   {action.status === "APPROVED" && (
                     <button onClick={() => dispatchSandbox(action.id)} disabled={dispatching === action.id} className="rounded-lg bg-[#3366FF] px-3 py-2 text-xs font-bold text-white hover:bg-[#2852cc] disabled:bg-blue-300">
                       {dispatching === action.id ? "Dispatching…" : "Dispatch action"}
