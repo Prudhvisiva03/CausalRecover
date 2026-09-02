@@ -186,13 +186,15 @@ def mark_recovery_completed(db: Session, payment: Payment, journey: RecoveryJour
     db.query(RecoveryAction).filter(
         RecoveryAction.journey_id == journey.id,
         RecoveryAction.status.in_(["PENDING", "APPROVED", "SCHEDULED", "EXECUTING"]),
-    ).update({"status": "COMPLETED", "executed_at": datetime.utcnow()})
+    ).update({"status": "COMPLETED"})
     db.query(ExperimentAssignment).filter(
         ExperimentAssignment.journey_id == journey.id,
         ExperimentAssignment.outcome.is_(None),
     ).update({"outcome": "RECOVERED", "recovered_amount": payment.amount, "resolved_at": datetime.utcnow()})
     db.add(AuditEvent(
-        journey_id=journey.id, payment_id=payment.id, actor_type="WEBHOOK", event_type="PAYMENT_RECOVERED",
+        journey_id=journey.id, payment_id=payment.id,
+        actor_type="RAZORPAY_API" if source == "RAZORPAY_API_RECONCILIATION" else "WEBHOOK",
+        event_type="PAYMENT_RECOVERED",
         reason=source, new_state="RECOVERED",
     ))
 
