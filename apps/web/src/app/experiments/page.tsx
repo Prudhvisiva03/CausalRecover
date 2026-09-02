@@ -38,6 +38,8 @@ export default function ExperimentsPage() {
         </section>
       )}
 
+      {experiments.length === 0 && <div className="rounded-xl border border-[#E4E6EA] bg-white p-8 text-center"><p className="font-semibold text-[#02042B]">No experiment has been started</p><p className="mt-1 text-sm text-[#515978]">Randomized treatment/control results will appear only after a real experiment is configured.</p></div>}
+
       {experiments.map((exp: any) => {
         const treatmentRate = ((exp.treatment_recovery_rate ?? 0) * 100).toFixed(1);
         const controlRate = ((exp.control_recovery_rate ?? 0) * 100).toFixed(1);

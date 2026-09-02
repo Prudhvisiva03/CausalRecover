@@ -36,6 +36,15 @@ const readable = (value?: string | null) => {
   return labels[value] || value.replace(/_/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
 };
 
+const displayFailure = (payment: any) => {
+  const reason = (payment?.failure_reason || "").toLowerCase();
+  if (reason.includes("declined by the bank")) return "Bank declined (unclassified)";
+  if (reason.includes("cancelled")) return "Payment cancelled";
+  return readable(payment?.failure_category);
+};
+
+const displayAuditReason = (reason?: string | null) => reason?.includes("_") ? readable(reason) : reason || "—";
+
 export default function JourneyDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [data, setData] = useState<any>(null);
@@ -65,6 +74,7 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
   const noAction = candidates?.find((c: any) => c.action_type === "NO_ACTION");
   const isRecovered = journey?.status === "RECOVERED" || payment.status === "recovered";
   const isTestModeRecovery = journey?.resolution === "RAZORPAY_API_RECONCILIATION" || payment.failure_code?.startsWith("TEST_MODE_");
+  const paymentContext = [payment.customer_id ? `Customer: ${payment.customer_id}` : null, payment.order_id ? `Order: ${payment.order_id}` : null].filter(Boolean).join(" • ");
 
   const dispatchSandbox = async (actionId: number) => {
     setDispatching(actionId);
@@ -118,7 +128,7 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
               {journey?.status || payment.status}
             </span>
           </h2>
-          <p className="text-[#515978] mt-1">Customer: {payment.customer_id}{payment.order_id ? ` • Order: ${payment.order_id}` : ""}</p>
+          {paymentContext && <p className="text-[#515978] mt-1">{paymentContext}</p>}
         </div>
       </div>
 
@@ -147,7 +157,7 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
           {isRecovered && <p className="-mt-2 mb-4 text-sm text-[#515978]">{isTestModeRecovery ? "This manually initiated Test Mode scenario started the recovery workflow; the payment outcome is confirmed above." : "This is the original failure that started the journey; the recovery outcome is confirmed above."}</p>}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div><p className="text-[#515978] mb-1">Provider</p><p className="font-semibold text-[#02042B]">Razorpay</p></div>
-            <div><p className="text-[#515978] mb-1">{isTestModeRecovery ? "Test scenario type" : isRecovered ? "Original failure type" : "Normalized Failure"}</p><p className={`font-semibold ${isRecovered ? "text-amber-700" : "text-red-600"}`}>{readable(payment.failure_category)}</p></div>
+            <div><p className="text-[#515978] mb-1">{isTestModeRecovery ? "Test scenario type" : isRecovered ? "Original failure type" : "Normalized Failure"}</p><p className={`font-semibold ${isRecovered ? "text-amber-700" : "text-red-600"}`}>{displayFailure(payment)}</p></div>
             <div><p className="text-[#515978] mb-1">Source → Step</p><p className="font-semibold text-[#02042B]">{readable(payment.failure_source)} → {readable(payment.failure_step)}</p></div>
             <div><p className="text-[#515978] mb-1">{isTestModeRecovery ? "Scenario reason" : "Initial failure reason"}</p><p className="text-[#02042B]">{payment.failure_reason}</p></div>
             <div><p className="text-[#515978] mb-1">Payment Method</p><p className="font-semibold text-[#02042B] uppercase">{payment.method}</p></div>
@@ -265,10 +275,10 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
             AI Decision Reasoning
           </h3>
           <p className="text-slate-300 leading-relaxed">
-            <strong className="text-white">{selected.action_type}</strong> was selected because it produces the highest policy-compliant
+            {selected.action_type === "NO_ACTION" ? <><strong className="text-white">No action</strong> was selected as the baseline because every intervention was blocked by merchant policy or did not meet the minimum economic threshold. No customer recovery workflow will be dispatched automatically.</> : <><strong className="text-white">{selected.action_type}</strong> was selected because it produces the highest policy-compliant
             <strong className="text-blue-400"> Net Expected Incremental Value (₹{selected.net_incremental_value?.toLocaleString('en-IN')})</strong>.
             {noAction && <span> The natural recovery probability is {(noAction.probability * 100).toFixed(1)}%, meaning without intervention there is already a {(noAction.probability * 100).toFixed(1)}% chance of recovery. The selected action adds an estimated <strong className="text-green-400">+{(selected.uplift * 100).toFixed(1)}%</strong> incremental uplift.</span>}
-            {journey?.resolution === "POLICY_BLOCKED" && <span className="text-red-300"> However, this journey was ultimately BLOCKED by merchant policy constraints.</span>}
+            {journey?.resolution === "POLICY_BLOCKED" && <span className="text-red-300"> However, this journey was ultimately BLOCKED by merchant policy constraints.</span>}</>}
           </p>
         </div>
       )}
@@ -344,7 +354,7 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
                     {a.decision && <span><span className="text-[#8B94A7]">Action:</span> {readable(a.decision)}</span>}
                     {a.new_state && <span className={`rounded-full px-2 py-0.5 font-semibold ${a.new_state === 'WAITING' ? 'bg-blue-50 text-blue-700' : a.new_state === 'ACTION_PENDING' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{readable(a.new_state)}</span>}
                   </div>
-                  {a.reason && <p className="mt-2 max-w-4xl text-sm leading-5 text-[#515978]">{readable(a.reason)}</p>}
+                  {a.reason && <p className="mt-2 max-w-4xl text-sm leading-5 text-[#515978]">{displayAuditReason(a.reason)}</p>}
                 </div>
               </div>
             ))}

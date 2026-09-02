@@ -62,6 +62,7 @@ export default function JourneysList() {
       </div>
 
       <div className="bg-white border border-[#E4E6EA] rounded-xl overflow-x-auto shadow-sm">
+        {journeys.length === 0 ? <div className="flex h-56 flex-col items-center justify-center text-center"><p className="font-semibold text-[#02042B]">No recovery journeys found</p><p className="mt-1 text-sm text-[#515978]">A verified Razorpay payment failure creates a journey.</p></div> :
         <table className="w-full min-w-[1180px] text-left text-sm">
           <thead className="bg-[#F4F5F8] border-b border-[#E4E6EA] text-[#515978] font-semibold uppercase text-xs tracking-wider">
             <tr>
@@ -83,7 +84,7 @@ export default function JourneysList() {
                 <td className="px-5 py-3 font-mono text-xs text-[#02042B]">{j.payment_id}</td>
                 <td className="px-5 py-3 text-xs text-[#515978]">{j.customer_id || '—'}</td>
                 <td className="px-5 py-3 font-semibold text-[#02042B]">₹{j.amount_at_risk?.toLocaleString('en-IN')}</td>
-                <td className="px-5 py-3"><span className="inline-flex whitespace-nowrap text-xs bg-red-50 text-red-700 px-2 py-1 rounded-md">{displayFailure(j)}</span></td>
+                <td className="px-5 py-3"><span className={`inline-flex whitespace-nowrap text-xs px-2 py-1 rounded-md ${j.status === "RECOVERED" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>{j.status === "RECOVERED" ? `Original: ${displayFailure(j)}` : displayFailure(j)}</span></td>
                 <td className="px-5 py-3 text-xs font-medium text-[#02042B] whitespace-nowrap">{readable(j.selected_action)}</td>
                 <td className="px-5 py-3 text-xs font-semibold whitespace-nowrap">{j.selected_net_value > 0 ? <span className="text-green-600">₹{j.selected_net_value?.toLocaleString('en-IN')}</span> : '—'}</td>
                 <td className="px-5 py-3 text-xs text-[#515978]">{readable(j.resolution)}</td>
@@ -99,6 +100,7 @@ export default function JourneysList() {
             ))}
           </tbody>
         </table>
+        }
       </div>
     </div>
   );

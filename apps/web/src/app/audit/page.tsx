@@ -29,6 +29,7 @@ export default function AuditTrailPage() {
       </div>
 
       <div className="bg-white border border-[#E4E6EA] rounded-xl overflow-hidden shadow-sm">
+        {events.length === 0 ? <div className="flex h-56 items-center justify-center text-sm text-[#8B94A7]">No verified audit events yet.</div> :
         <table className="w-full text-left text-sm">
           <thead className="bg-[#F4F5F8] border-b border-[#E4E6EA] text-[#515978] font-semibold uppercase text-xs tracking-wider">
             <tr>
@@ -66,6 +67,7 @@ export default function AuditTrailPage() {
             ))}
           </tbody>
         </table>
+        }
       </div>
     </div>
   );

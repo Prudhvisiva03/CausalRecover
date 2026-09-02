@@ -22,6 +22,7 @@ export default function PoliciesPage() {
   };
 
   const categories = [...new Set(policies.map(p => p.category))];
+  const policy = (key: string) => policies.find(p => p.key === key)?.value;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
@@ -31,8 +32,10 @@ export default function PoliciesPage() {
       </div>
 
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
-        <strong>Policy Summary:</strong> Automatically execute actions costing ≤ ₹50 when predicted net incremental value exceeds ₹10. Require human approval for transactions above ₹25,000.
+        <strong>Policy Summary:</strong> {policies.length === 0 ? "No merchant overrides are stored. Conservative system defaults apply until policies are configured." : `Actions above ₹${policy("human_approval_above_amount") || "—"} require human approval; maximum allowed action cost is ₹${policy("max_action_cost") || "—"}.`}
       </div>
+
+      {policies.length === 0 && <div className="rounded-xl border border-[#E4E6EA] bg-white p-8 text-center text-sm text-[#515978]">No merchant policy records are configured yet.</div>}
 
       {categories.map(cat => (
         <div key={cat} className="bg-white rounded-xl border border-[#E4E6EA] shadow-sm overflow-hidden">

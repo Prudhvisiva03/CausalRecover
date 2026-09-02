@@ -7,6 +7,14 @@ import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+const readable = (value?: string | null) => value ? value.replace(/_/g, " ").replace(/\b\w/g, letter => letter.toUpperCase()) : "—";
+const displayFailure = (journey: any) => {
+  const reason = (journey.failure_reason || "").toLowerCase();
+  if (reason.includes("declined by the bank")) return "Bank declined";
+  if (reason.includes("cancelled")) return "Payment cancelled";
+  return readable(journey.failure_category);
+};
+
 function MetricCard({ title, value, subtitle, icon: Icon, color }: any) {
   return (
     <div className="bg-white p-5 rounded-xl border border-[#E4E6EA] shadow-sm">
@@ -38,7 +46,7 @@ export default function DashboardOverview() {
   const funnelData = [
     { name: 'At Risk', value: data.total_journeys, fill: '#ef4444' },
     { name: 'Evaluated', value: data.total_journeys, fill: '#f59e0b' },
-    { name: 'Action Approved', value: Math.max(data.recovered_journeys, data.total_journeys - data.actions_avoided), fill: '#3b82f6' },
+    { name: 'Actions Dispatched', value: data.actioned_journeys, fill: '#3b82f6' },
     { name: 'Recovered', value: data.recovered_journeys, fill: '#22c55e' },
   ];
 
@@ -55,7 +63,7 @@ export default function DashboardOverview() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard title="Revenue At Risk" value={fmt(data.revenue_at_risk)} subtitle="Total failed payment value" icon={ShieldAlert} color="red" />
-        <MetricCard title="Recorded Gross Recovered" value={fmt(data.gross_recovered)} subtitle="Evaluation outcomes + verified Test Mode events" icon={CheckCircle2} color="green" />
+        <MetricCard title="Verified Gross Recovered" value={fmt(data.gross_recovered)} subtitle="Provider-confirmed recovery outcomes only" icon={CheckCircle2} color="green" />
         <MetricCard title="Estimated Incremental" value={fmt(data.estimated_incremental)} subtitle="Causal uplift value (MODEL ESTIMATE)" icon={TrendingUp} color="blue" />
         <MetricCard title="Net Incremental Value" value={fmt(data.net_incremental_value)} subtitle="After intervention costs" icon={Zap} color="indigo" />
       </div>
@@ -83,7 +91,7 @@ export default function DashboardOverview() {
       <div className="bg-white p-6 rounded-xl border border-[#E4E6EA] shadow-sm">
         <h3 className="text-lg font-bold text-[#02042B] mb-1">Recovery Funnel</h3>
         <p className="text-sm text-[#515978] mb-4">Journey progression from at-risk to recovered.</p>
-        <div className="h-[200px]">
+        {data.total_journeys === 0 ? <div className="flex h-[200px] items-center justify-center text-sm text-[#8B94A7]">No verified failed payments received yet.</div> : <div className="h-[200px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={funnelData} layout="vertical" margin={{ left: 80 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
@@ -95,7 +103,7 @@ export default function DashboardOverview() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </div>}
       </div>
 
       {/* Recent Journeys */}
@@ -105,6 +113,7 @@ export default function DashboardOverview() {
           <Link href="/journeys" className="text-sm text-blue-600 hover:text-blue-700 font-medium">View all →</Link>
         </div>
         <div className="bg-white border border-[#E4E6EA] rounded-xl overflow-hidden shadow-sm">
+          {journeys.length === 0 ? <div className="flex h-40 items-center justify-center text-sm text-[#8B94A7]">No verified recovery journeys yet.</div> :
           <table className="w-full text-left text-sm">
             <thead className="bg-[#F4F5F8] border-b border-[#E4E6EA] text-[#515978] font-semibold uppercase text-xs tracking-wider">
               <tr>
@@ -124,8 +133,8 @@ export default function DashboardOverview() {
                     <div className="text-xs text-[#8B94A7]">{j.customer_id}</div>
                   </td>
                   <td className="px-5 py-3 font-semibold text-[#02042B]">₹{j.amount_at_risk?.toLocaleString('en-IN')}</td>
-                  <td className="px-5 py-3 text-[#515978] text-xs">{j.failure_category}</td>
-                  <td className="px-5 py-3 text-[#02042B] font-medium text-xs">{j.selected_action || 'NO_ACTION'}</td>
+                  <td className="px-5 py-3 text-[#515978] text-xs">{displayFailure(j)}</td>
+                  <td className="px-5 py-3 text-[#02042B] font-medium text-xs">{readable(j.selected_action || 'NO_ACTION')}</td>
                   <td className="px-5 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                       j.selected_uplift > 0 ? 'bg-green-100 text-green-700' : 'bg-[#F4F5F8] text-[#515978]'
@@ -140,13 +149,14 @@ export default function DashboardOverview() {
                       j.status === 'ESCALATED' ? 'bg-amber-100 text-amber-700' :
                       'bg-blue-100 text-blue-700'
                     }`}>
-                      {j.status}
+                      {readable(j.status)}
                     </span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          }
         </div>
       </div>
     </div>

@@ -58,6 +58,10 @@ export default function IntegrationsPage() {
               <p className="font-bold text-green-600">{razorpay.valid_webhooks}</p>
             </div>
             <div className="bg-[#F4F5F8] p-3 rounded-lg">
+              <p className="text-xs text-[#515978]">Signature validation</p>
+              <p className={`font-bold text-xs ${razorpay.webhook_signature_required ? "text-green-600" : "text-amber-600"}`}>{razorpay.webhook_signature_required ? "Required" : "Not required"}</p>
+            </div>
+            <div className="bg-[#F4F5F8] p-3 rounded-lg">
               <p className="text-xs text-[#515978]">Last Webhook</p>
               <p className="font-bold text-[#02042B] text-xs">{razorpay.last_webhook ? formatApiDate(razorpay.last_webhook) : 'None'}</p>
             </div>
@@ -67,18 +71,16 @@ export default function IntegrationsPage() {
 
       {/* Communication Adapters */}
       {[
-        { name: "Email Adapter", desc: "Transactional email for recovery nudges", status: "Configured" },
-        { name: "SMS Adapter", desc: "SMS notifications for payment links", status: "Not Connected" },
-        { name: "WhatsApp Adapter", desc: "WhatsApp Business for customer nudges", status: "Not Connected" },
+        { name: "Email Adapter", desc: "Transactional email for recovery nudges", configured: razorpay?.communication_adapters?.email },
+        { name: "SMS Adapter", desc: "SMS notifications for payment links", configured: razorpay?.communication_adapters?.sms },
+        { name: "WhatsApp Adapter", desc: "WhatsApp Business for customer nudges", configured: razorpay?.communication_adapters?.whatsapp },
       ].map(adapter => (
         <div key={adapter.name} className="bg-white rounded-xl border border-[#E4E6EA] shadow-sm p-6 flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-[#02042B]">{adapter.name}</h3>
             <p className="text-sm text-[#515978]">{adapter.desc}</p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            adapter.status === 'Configured' ? 'bg-green-100 text-green-700' : 'bg-[#F4F5F8] text-[#515978]'
-          }`}>{adapter.status}</span>
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${adapter.configured ? 'bg-green-100 text-green-700' : 'bg-[#F4F5F8] text-[#515978]'}`}>{adapter.configured ? "Configured" : "Not configured"}</span>
         </div>
       ))}
     </div>

@@ -9,7 +9,7 @@ from database.models import (
 from core.economic_optimizer import evaluate_transaction
 from core.policy_engine import evaluate_policies
 from core.razorpay_adapter import create_recovery_payment_link, fetch_recovery_link_outcome, RazorpayAdapterError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 import json
@@ -203,7 +203,11 @@ def mark_recovery_completed(db: Session, payment: Payment, journey: RecoveryJour
 # ══════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return {"status": "healthy", "version": "1.0.0", "mode": "TEST"}
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "mode": os.getenv("RAZORPAY_MODE", "TEST").upper(),
+    }
 
 # ══════════════════════════════════════════════════════════════
 # DASHBOARD OVERVIEW
@@ -243,6 +247,10 @@ def dashboard_overview(db: Session = Depends(get_db)):
     active_journeys = db.query(func.count(RecoveryJourney.id)).filter(
         RecoveryJourney.status.in_(["EVALUATING", "ACTION_PENDING", "ACTION_EXECUTED", "WAITING"])
     ).scalar() or 0
+
+    actioned_journeys = db.query(func.count(func.distinct(RecoveryAction.journey_id))).filter(
+        RecoveryAction.status.in_(["APPROVED", "EXECUTING", "COMPLETED"])
+    ).scalar() or 0
     
     return {
         "revenue_at_risk": round(total_at_risk, 2),
@@ -256,6 +264,7 @@ def dashboard_overview(db: Session = Depends(get_db)):
         "active_journeys": active_journeys,
         "total_journeys": total_journeys,
         "recovered_journeys": recovered_journeys,
+        "actioned_journeys": actioned_journeys,
     }
 
 # ══════════════════════════════════════════════════════════════
@@ -462,7 +471,7 @@ def get_journeys(
 # SIMULATOR / DECISION LAB
 # ══════════════════════════════════════════════════════════════
 class SimulatorRequest(BaseModel):
-    amount: float = 7499
+    amount: float = Field(gt=0)
     failure_category: str = "ISSUER_UNAVAILABLE"
     payment_method: str = "card"
     historical_success_rate: float = 0.65
@@ -798,13 +807,21 @@ def razorpay_status(db: Session = Depends(get_db)):
     valid_webhooks = db.query(func.count(WebhookEvent.id)).filter(WebhookEvent.signature_valid == True).scalar() or 0
     
     connected = bool(os.getenv("RAZORPAY_KEY_ID") and os.getenv("RAZORPAY_KEY_SECRET"))
+    mode = os.getenv("RAZORPAY_MODE", "TEST").upper()
+    communication_adapters = {
+        "email": bool(os.getenv("EMAIL_API_KEY") or os.getenv("SMTP_HOST")),
+        "sms": bool(os.getenv("SMS_API_KEY") or os.getenv("TWILIO_ACCOUNT_SID")),
+        "whatsapp": bool(os.getenv("WHATSAPP_ACCESS_TOKEN")),
+    }
     return {
         "connected": connected,
         "connection_status": "CONNECTED" if connected else "CONFIGURATION_REQUIRED",
-        "mode": "TEST",
+        "mode": mode,
         "total_webhooks": total_webhooks,
         "valid_webhooks": valid_webhooks,
         "last_webhook": last_webhook.received_at.isoformat() if last_webhook else None,
+        "webhook_signature_required": os.getenv("WEBHOOK_SIGNATURE_REQUIRED", "true").lower() == "true",
+        "communication_adapters": communication_adapters,
     }
 
 # ══════════════════════════════════════════════════════════════
@@ -871,7 +888,7 @@ def get_model_info():
             "version": "v1.0", "algorithm": "LightGBM Classifier", "approach": card["approach"],
             "dataset_size": metric.get("samples_train", card["train_size"]),
             "test_size": metric.get("samples_test", card["test_size"]),
-            "features": card["features"], "trained_at": "2026-08-31", "status": "ACTIVE",
+            "features": card["features"], "trained_at": "2026-08-31", "status": "OFFLINE_VALIDATION",
             "roc_auc": metric.get("roc_auc"), "brier_score": metric.get("brier_score"),
         })
     return {"models": models, "limitations": " ".join(card["known_limitations"]), "dataset_label": "OFFLINE VALIDATION"}
@@ -884,7 +901,7 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.body()
     signature = request.headers.get("X-Razorpay-Signature", "")
     secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
-    signature_required = os.getenv("WEBHOOK_SIGNATURE_REQUIRED", "false").lower() == "true"
+    signature_required = os.getenv("WEBHOOK_SIGNATURE_REQUIRED", "true").lower() == "true"
     signature_valid = not signature_required or bool(signature and secret and hmac.compare_digest(
         hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest(), signature
     ))
@@ -976,6 +993,11 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
         journey = RecoveryJourney(payment_id=pay_id, customer_id=customer_id, amount_at_risk=payment.amount, status="EVALUATING")
         db.add(journey)
         db.flush()
+        db.add(AuditEvent(
+            journey_id=journey.id, payment_id=payment.id, actor_type="WEBHOOK",
+            event_type="PAYMENT_FAILED", reason=failure_reason, new_state="EVALUATING",
+            timestamp=datetime.utcfromtimestamp(entity["created_at"]) if entity.get("created_at") else datetime.utcnow(),
+        ))
         evaluate_and_queue_recovery(db, payment, journey, customer)
         webhook_event.processed = True
         db.commit()

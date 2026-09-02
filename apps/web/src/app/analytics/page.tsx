@@ -17,13 +17,13 @@ export default function AnalyticsPage() {
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
       <div>
         <h2 className="text-2xl font-bold text-[#02042B]">Revenue Analytics</h2>
-        <p className="text-[#515978] mt-1">Offline evaluation performance by failure type and intervention; validate against live cohorts before making impact claims.</p>
+        <p className="text-[#515978] mt-1">Only verified provider events are included. Model estimates are not recorded revenue or causal proof.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-xl border border-[#E4E6EA] shadow-sm">
           <h3 className="text-base font-bold text-[#02042B] mb-4">Recovery by Failure Type</h3>
-          <div className="h-[280px]">
+          {byFailure.length === 0 ? <div className="flex h-[280px] items-center justify-center text-sm text-[#8B94A7]">No verified failure data yet.</div> : <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byFailure} margin={{ left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -34,12 +34,12 @@ export default function AnalyticsPage() {
                 <Bar dataKey="recovered" name="Recovered" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={24} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </div>}
         </div>
 
         <div className="bg-white p-6 rounded-xl border border-[#E4E6EA] shadow-sm">
           <h3 className="text-base font-bold text-[#02042B] mb-4">Net Value by Action Type</h3>
-          <div className="h-[280px]">
+          {byAction.length === 0 ? <div className="flex h-[280px] items-center justify-center text-sm text-[#8B94A7]">No evaluated actions yet.</div> : <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byAction} margin={{ left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -49,7 +49,7 @@ export default function AnalyticsPage() {
                 <Bar dataKey="total_net_value" name="Net Incremental Value" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={32} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -64,6 +64,7 @@ export default function AnalyticsPage() {
               <tr><th className="px-5 py-2 text-left">Category</th><th className="px-5 py-2 text-right">Total</th><th className="px-5 py-2 text-right">Recovered</th><th className="px-5 py-2 text-right">Rate</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
+              {byFailure.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-sm text-[#8B94A7]">No verified data.</td></tr>}
               {byFailure.map((f: any) => (
                 <tr key={f.failure_category}>
                   <td className="px-5 py-2 text-xs font-medium text-[#02042B]">{f.failure_category}</td>
@@ -85,6 +86,7 @@ export default function AnalyticsPage() {
               <tr><th className="px-5 py-2 text-left">Action</th><th className="px-5 py-2 text-right">Count</th><th className="px-5 py-2 text-right">Avg Uplift</th><th className="px-5 py-2 text-right">Total Net ₹</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
+              {byAction.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-sm text-[#8B94A7]">No evaluated actions.</td></tr>}
               {byAction.map((a: any) => (
                 <tr key={a.action_type}>
                   <td className="px-5 py-2 text-xs font-medium text-[#02042B]">{a.action_type}</td>

@@ -99,7 +99,7 @@ export default function ActionQueuePage() {
           <div className="flex h-56 flex-col items-center justify-center text-center"><CheckCircle2 className="h-8 w-8 text-emerald-500" /><p className="mt-3 font-semibold text-[#02042B]">Action queue is clear</p><p className="mt-1 text-sm text-[#515978]">New payment failures will appear here after evaluation.</p></div>
         ) : (
           <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="border-b border-[#E4E6EA] bg-[#F4F5F8] text-xs font-semibold uppercase tracking-wider text-[#515978]"><tr><th className="px-5 py-3">Payment</th><th className="px-5 py-3">Recommended action</th><th className="px-5 py-3">Expected net value</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Reason / provider</th><th className="px-5 py-3 text-right">Controls</th></tr></thead>
+            <thead className="border-b border-[#E4E6EA] bg-[#F4F5F8] text-xs font-semibold uppercase tracking-wider text-[#515978]"><tr><th className="px-5 py-3">Payment</th><th className="px-5 py-3">Recommended action</th><th className="px-5 py-3">Model-estimated net value</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Reason / provider</th><th className="px-5 py-3 text-right">Controls</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {actions.map(action => <tr key={action.id} className="hover:bg-slate-50">
                 <td className="px-5 py-4"><Link href={`/journeys/${action.payment_id}`} className="font-mono text-xs font-semibold text-[#02042B] hover:text-[#3366FF]">{action.payment_id}</Link><p className="mt-1 text-xs text-[#8B94A7]">Journey #{action.journey_id} · ₹{action.amount?.toLocaleString("en-IN")}</p></td>

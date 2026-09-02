@@ -18,6 +18,13 @@ const formatActionName = (action: string) => {
   return map[action] || action.replace(/_/g, ' ');
 };
 
+const displayFailure = (payment: any) => {
+  const reason = (payment.failure_reason || "").toLowerCase();
+  if (reason.includes("declined by the bank")) return "Bank declined (unclassified)";
+  if (reason.includes("cancelled")) return "Payment cancelled";
+  return payment.failure_category?.replace(/_/g, " ") || "UNCLASSIFIED";
+};
+
 const getStatusBadge = (status: string) => {
   if (status === 'RECOVERED') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#00D27A]/10 text-[#00D27A] text-[11px] font-bold tracking-wide"><CheckCircle2 className="w-3 h-3" /> RECOVERED</span>;
   if (status === 'STOPPED') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-[#515978] text-[11px] font-bold tracking-wide"><XCircle className="w-3 h-3" /> BLOCKED</span>;
@@ -51,7 +58,7 @@ export default function AtRiskPayments() {
       <div className="flex justify-between items-end mb-8">
         <div>
           <h2 className="text-3xl font-extrabold text-[#02042B] tracking-tight">At-Risk Payments</h2>
-          <p className="text-[#515978] mt-1 font-medium text-sm">{filteredPayments.length} failed payments requiring evaluation.</p>
+          <p className="text-[#515978] mt-1 font-medium text-sm">{filteredPayments.length} unresolved failed payments from verified provider events.</p>
         </div>
         
         <div className="flex items-center gap-4">
@@ -81,6 +88,7 @@ export default function AtRiskPayments() {
         </div>
       ) : (
         <div className="bg-white border border-[#E4E6EA] rounded-xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+          {filteredPayments.length === 0 ? <div className="flex h-56 flex-col items-center justify-center text-center"><CheckCircle2 className="h-8 w-8 text-emerald-500" /><p className="mt-3 font-semibold text-[#02042B]">No failed payments to evaluate</p><p className="mt-1 text-sm text-[#515978]">Verified Razorpay payment failures will appear here.</p></div> :
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-[#FAFBFC] border-b border-[#E4E6EA] text-[#515978] font-bold text-[11px] uppercase tracking-widest">
               <tr>
@@ -115,7 +123,7 @@ export default function AtRiskPayments() {
                   <td className="px-6 py-4">
                     <p className="max-w-[260px] whitespace-normal text-xs font-medium text-[#02042B]">{p.failure_reason || 'Provider did not provide a reason.'}</p>
                     <span className="mt-1 inline-flex items-center px-2 py-1 bg-red-50 text-red-700 text-[10px] font-bold rounded uppercase tracking-wider border border-red-100/50">
-                      {p.failure_category?.replace(/_/g, ' ') || 'UNCLASSIFIED'}
+                      {displayFailure(p)}
                     </span>
                   </td>
                   
@@ -126,7 +134,7 @@ export default function AtRiskPayments() {
                       ) : !p.best_action ? (
                         <span className="text-amber-700">Awaiting evaluation</span>
                       ) : (
-                        <span className="text-[#8B94A7]">No Action Viable</span>
+                        <span className="text-[#515978]">Natural recovery monitoring</span>
                       )}
                     </div>
                     <div className="text-[11px] font-bold text-[#515978] flex items-center gap-1.5">
@@ -148,6 +156,7 @@ export default function AtRiskPayments() {
               ))}
             </tbody>
           </table>
+          }
         </div>
       )}
     </div>

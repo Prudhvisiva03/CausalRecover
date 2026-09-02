@@ -28,7 +28,7 @@ export default function ModelsPage() {
           <div key={i} className="bg-white rounded-xl border border-[#E4E6EA] shadow-sm p-5">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-sm font-bold text-[#02042B]">{m.name}</h3>
-              <span className={`px-2 py-0.5 rounded text-xs font-bold ${m.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-[#F4F5F8] text-[#515978]'}`}>{m.status}</span>
+              <span className="px-2 py-0.5 rounded bg-amber-100 text-xs font-bold text-amber-700">{m.status.replace(/_/g, " ")}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-[#515978]">Version</span><span className="text-[#02042B] font-medium">{m.version}</span></div>

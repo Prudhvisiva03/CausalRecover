@@ -5,7 +5,7 @@ import { Zap, CheckCircle2, XCircle, AlertTriangle, Activity } from "lucide-reac
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function DecisionLab() {
-  const [amount, setAmount] = useState(7499);
+  const [amount, setAmount] = useState<number | "">("");
   const [failureCat, setFailureCat] = useState("ISSUER_UNAVAILABLE");
   const [method, setMethod] = useState("card");
   const [histRate, setHistRate] = useState(0.65);
@@ -20,7 +20,7 @@ export default function DecisionLab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount, failure_category: failureCat, payment_method: method,
+          amount: Number(amount), failure_category: failureCat, payment_method: method,
           historical_success_rate: histRate, contact_consent: consent,
         }),
       });
@@ -45,7 +45,7 @@ export default function DecisionLab() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div>
             <label className="text-sm font-medium text-[#515978] block mb-1">Amount (₹)</label>
-            <input type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} className="w-full px-3 py-2 border border-[#E4E6EA] rounded-lg text-sm" />
+            <input type="number" min="0.01" placeholder="Enter a test amount" value={amount} onChange={e => setAmount(e.target.value === "" ? "" : Number(e.target.value))} className="w-full px-3 py-2 border border-[#E4E6EA] rounded-lg text-sm" />
           </div>
           <div>
             <label className="text-sm font-medium text-[#515978] block mb-1">Failure Category</label>
@@ -76,7 +76,7 @@ export default function DecisionLab() {
             </label>
           </div>
           <div className="flex items-end">
-            <button onClick={evaluate} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-6 py-2 rounded-lg font-medium transition-colors text-sm">
+            <button onClick={evaluate} disabled={loading || amount === "" || amount <= 0} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-6 py-2 rounded-lg font-medium transition-colors text-sm">
               {loading ? "Evaluating..." : "Evaluate Recovery Strategy"}
             </button>
           </div>
