@@ -142,16 +142,16 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
         <div className="bg-white p-6 rounded-xl border border-[#E4E6EA] shadow-sm col-span-2">
           <h3 className="text-base font-bold text-[#02042B] mb-4 flex items-center gap-2">
             <ShieldAlert className={`w-5 h-5 ${isRecovered ? "text-amber-500" : "text-red-500"}`} />
-            {isRecovered ? "Original Payment Failure" : "Failure Diagnosis"}
+            {isRecovered && isTestModeRecovery ? "Test Mode Recovery Scenario" : isRecovered ? "Original Payment Failure" : "Failure Diagnosis"}
           </h3>
-          {isRecovered && <p className="-mt-2 mb-4 text-sm text-[#515978]">This is the original failure that started the journey; the recovery outcome is confirmed above.</p>}
+          {isRecovered && <p className="-mt-2 mb-4 text-sm text-[#515978]">{isTestModeRecovery ? "This manually initiated Test Mode scenario started the recovery workflow; the payment outcome is confirmed above." : "This is the original failure that started the journey; the recovery outcome is confirmed above."}</p>}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div><p className="text-[#515978] mb-1">Provider</p><p className="font-semibold text-[#02042B]">Razorpay</p></div>
-            <div><p className="text-[#515978] mb-1">{isRecovered ? "Original failure type" : "Normalized Failure"}</p><p className={`font-semibold ${isRecovered ? "text-amber-700" : "text-red-600"}`}>{readable(payment.failure_category)}</p></div>
+            <div><p className="text-[#515978] mb-1">{isTestModeRecovery ? "Test scenario type" : isRecovered ? "Original failure type" : "Normalized Failure"}</p><p className={`font-semibold ${isRecovered ? "text-amber-700" : "text-red-600"}`}>{readable(payment.failure_category)}</p></div>
             <div><p className="text-[#515978] mb-1">Source → Step</p><p className="font-semibold text-[#02042B]">{readable(payment.failure_source)} → {readable(payment.failure_step)}</p></div>
-            <div><p className="text-[#515978] mb-1">Initial failure reason</p><p className="text-[#02042B]">{payment.failure_reason}</p></div>
+            <div><p className="text-[#515978] mb-1">{isTestModeRecovery ? "Scenario reason" : "Initial failure reason"}</p><p className="text-[#02042B]">{payment.failure_reason}</p></div>
             <div><p className="text-[#515978] mb-1">Payment Method</p><p className="font-semibold text-[#02042B] uppercase">{payment.method}</p></div>
-            <div><p className="text-[#515978] mb-1">Initial failure recorded</p><p className="font-semibold text-[#02042B]">{formatApiDate(payment.created_at)}</p><p className="mt-1 text-xs text-[#8B94A7]">Provider checkout outcomes appear in the event timeline.</p></div>
+            <div><p className="text-[#515978] mb-1">{isTestModeRecovery ? "Scenario recorded" : "Initial failure recorded"}</p><p className="font-semibold text-[#02042B]">{formatApiDate(payment.created_at)}</p><p className="mt-1 text-xs text-[#8B94A7]">Provider checkout outcomes appear in the event timeline.</p></div>
           </div>
         </div>
 
