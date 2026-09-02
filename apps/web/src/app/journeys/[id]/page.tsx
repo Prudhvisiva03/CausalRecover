@@ -117,7 +117,7 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
             <div><p className="text-[#515978] mb-1">Source → Step</p><p className="font-semibold text-[#02042B]">{payment.failure_source} → {payment.failure_step}</p></div>
             <div><p className="text-[#515978] mb-1">Reason</p><p className="text-[#02042B]">{payment.failure_reason}</p></div>
             <div><p className="text-[#515978] mb-1">Payment Method</p><p className="font-semibold text-[#02042B] uppercase">{payment.method}</p></div>
-            <div><p className="text-[#515978] mb-1">Payment failure time</p><p className="font-semibold text-[#02042B]">{formatApiDate(payment.created_at)}</p></div>
+            <div><p className="text-[#515978] mb-1">Initial failure recorded</p><p className="font-semibold text-[#02042B]">{formatApiDate(payment.created_at)}</p><p className="mt-1 text-xs text-[#8B94A7]">Provider checkout outcomes appear in the event timeline.</p></div>
           </div>
         </div>
 
