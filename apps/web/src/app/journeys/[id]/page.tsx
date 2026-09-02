@@ -337,7 +337,7 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
                   {i < audit_trail.length - 1 && <div className="w-px h-6 bg-slate-200"></div>}
                 </div>
                 <div className="flex-1 min-w-0 pb-3">
-                  <p className="text-sm font-semibold text-[#02042B]">{readable(a.event_type)}</p>
+                  <p className="text-sm font-semibold text-[#02042B]">{isTestModeRecovery && a.event_type === "PAYMENT_FAILED" ? "Test Mode recovery scenario initiated" : readable(a.event_type)}</p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[#515978]">
                     {a.timestamp && <span>{formatApiDate(a.timestamp)}</span>}
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{readable(a.actor_type)}</span>
