@@ -1004,13 +1004,24 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
         return {"status": "ok", "journey_id": journey.id, "selected_action": payment.best_action}
 
     if event_type == "payment_link.paid":
-        link_id = data.get("payload", {}).get("payment_link", {}).get("entity", {}).get("id")
+        link_entity = data.get("payload", {}).get("payment_link", {}).get("entity", {})
+        link_id = link_entity.get("id")
         linked_action = db.query(RecoveryAction).filter(RecoveryAction.provider_reference == link_id).first()
-        if linked_action:
-            journey = db.query(RecoveryJourney).filter(RecoveryJourney.id == linked_action.journey_id).first()
-            payment = db.query(Payment).filter(Payment.id == journey.payment_id).first() if journey else None
-            if payment and journey:
-                mark_recovery_completed(db, payment, journey, "RAZORPAY_PAYMENT_LINK_WEBHOOK")
+        journey = db.query(RecoveryJourney).filter(RecoveryJourney.id == linked_action.journey_id).first() if linked_action else None
+        payment = db.query(Payment).filter(Payment.id == journey.payment_id).first() if journey else None
+        # A customer can successfully retry on the *original* Razorpay Payment
+        # Link. It has no CausalRecover action reference, so correlate it by its
+        # Razorpay order ID instead of leaving the failed journey unresolved.
+        if not payment and link_entity.get("order_id"):
+            payment = db.query(Payment).filter(
+                Payment.order_id == link_entity["order_id"], Payment.status == "failed"
+            ).order_by(desc(Payment.created_at)).first()
+            journey = db.query(RecoveryJourney).filter(RecoveryJourney.payment_id == payment.id).first() if payment else None
+        if payment and journey and journey.status != "RECOVERED":
+            mark_recovery_completed(
+                db, payment, journey,
+                "RAZORPAY_PAYMENT_LINK_WEBHOOK" if linked_action else "RAZORPAY_ORIGINAL_LINK_RETRY_WEBHOOK",
+            )
         webhook_event.processed = True
         db.commit()
         return {"status": "ok"}
@@ -1045,10 +1056,15 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
             if linked_action:
                 linked_journey = db.query(RecoveryJourney).filter(RecoveryJourney.id == linked_action.journey_id).first()
                 payment = db.query(Payment).filter(Payment.id == linked_journey.payment_id).first() if linked_journey else None
+        if not payment and entity.get("order_id"):
+            payment = db.query(Payment).filter(
+                Payment.order_id == entity["order_id"], Payment.status == "failed"
+            ).order_by(desc(Payment.created_at)).first()
         if payment:
             journey = db.query(RecoveryJourney).filter(RecoveryJourney.payment_id == payment.id).first()
             if journey:
-                mark_recovery_completed(db, payment, journey, "RAZORPAY_PAYMENT_CAPTURED_WEBHOOK")
+                source = "RAZORPAY_PAYMENT_CAPTURED_WEBHOOK" if entity.get("id") == payment.id else "RAZORPAY_ORIGINAL_LINK_RETRY_CAPTURED"
+                mark_recovery_completed(db, payment, journey, source)
         webhook_event.processed = True
         db.commit()
     return {"status": "ok"}
