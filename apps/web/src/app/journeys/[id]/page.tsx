@@ -147,6 +147,7 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
               </p>
               {successfulPaymentId && <p className="mt-3 break-all text-sm font-semibold text-emerald-950">Successful retry payment: {successfulPaymentId}</p>}
               {recoveredPaymentLinkId && <p className="mt-1 break-all text-xs text-emerald-800">Razorpay Payment Link: {recoveredPaymentLinkId}</p>}
+              {selected?.action_type === "NO_ACTION" && <p className="mt-3 text-xs leading-5 text-emerald-900">Attribution: the customer retried the original Razorpay Payment Link. This is verified recovered revenue, but it is not counted as AI-attributed incremental revenue.</p>}
             </div>
           </div>
         </div>
