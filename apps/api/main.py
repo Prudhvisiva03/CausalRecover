@@ -177,7 +177,40 @@ def normalize_failure(reason: str | None, code: str | None) -> str:
     return "UNKNOWN"
 
 
-def mark_recovery_completed(db: Session, payment: Payment, journey: RecoveryJourney, source: str):
+def mark_recovery_completed(
+    db: Session,
+    payment: Payment,
+    journey: RecoveryJourney,
+    source: str,
+    successful_payment_id: str | None = None,
+    payment_link_id: str | None = None,
+):
+    """Record recovery evidence without replacing the original failed payment."""
+    recovery_metadata = {
+        key: value for key, value in {
+            "successful_payment_id": successful_payment_id,
+            "payment_link_id": payment_link_id,
+            "original_order_id": payment.order_id,
+        }.items() if value
+    }
+
+    # Razorpay can send payment.captured followed by payment_link.paid. Preserve
+    # the first completion timestamp and add evidence from the later webhook.
+    if journey.status == "RECOVERED":
+        existing = db.query(AuditEvent).filter(
+            AuditEvent.journey_id == journey.id,
+            AuditEvent.payment_id == payment.id,
+            AuditEvent.event_type == "PAYMENT_RECOVERED",
+        ).order_by(desc(AuditEvent.timestamp)).first()
+        if existing and recovery_metadata:
+            try:
+                existing_metadata = json.loads(existing.metadata_json or "{}")
+            except (TypeError, json.JSONDecodeError):
+                existing_metadata = {}
+            existing_metadata.update(recovery_metadata)
+            existing.metadata_json = json.dumps(existing_metadata)
+        return
+
     payment.status = "recovered"
     journey.status = "RECOVERED"
     journey.recovered_amount = payment.amount
@@ -196,6 +229,7 @@ def mark_recovery_completed(db: Session, payment: Payment, journey: RecoveryJour
         actor_type="RAZORPAY_API" if source == "RAZORPAY_API_RECONCILIATION" else "WEBHOOK",
         event_type="PAYMENT_RECOVERED",
         reason=source, new_state="RECOVERED",
+        metadata_json=json.dumps(recovery_metadata) if recovery_metadata else None,
     ))
 
 # ══════════════════════════════════════════════════════════════
@@ -358,16 +392,23 @@ def get_payment_detail(payment_id: str, db: Session = Depends(get_db)):
             "executed_at": a.executed_at.isoformat() if a.executed_at else None,
         } for a in db.query(RecoveryAction).filter(RecoveryAction.journey_id == journey.id).all()]
     
-    audits = [{
-        "id": a.id,
-        "timestamp": a.timestamp.isoformat() if a.timestamp else None,
-        "actor_type": a.actor_type,
-        "event_type": a.event_type,
-        "decision": a.decision,
-        "reason": a.reason,
-        "previous_state": a.previous_state,
-        "new_state": a.new_state,
-    } for a in db.query(AuditEvent).filter(AuditEvent.payment_id == payment_id).order_by(AuditEvent.timestamp).all()]
+    audits = []
+    for a in db.query(AuditEvent).filter(AuditEvent.payment_id == payment_id).order_by(AuditEvent.timestamp).all():
+        try:
+            metadata = json.loads(a.metadata_json or "{}")
+        except (TypeError, json.JSONDecodeError):
+            metadata = {}
+        audits.append({
+            "id": a.id,
+            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+            "actor_type": a.actor_type,
+            "event_type": a.event_type,
+            "decision": a.decision,
+            "reason": a.reason,
+            "previous_state": a.previous_state,
+            "new_state": a.new_state,
+            "metadata": metadata,
+        })
     
     return {
         "payment": {
@@ -1005,6 +1046,7 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
 
     if event_type == "payment_link.paid":
         link_entity = data.get("payload", {}).get("payment_link", {}).get("entity", {})
+        successful_payment = data.get("payload", {}).get("payment", {}).get("entity", {})
         link_id = link_entity.get("id")
         linked_action = db.query(RecoveryAction).filter(RecoveryAction.provider_reference == link_id).first()
         journey = db.query(RecoveryJourney).filter(RecoveryJourney.id == linked_action.journey_id).first() if linked_action else None
@@ -1021,6 +1063,8 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
             mark_recovery_completed(
                 db, payment, journey,
                 "RAZORPAY_PAYMENT_LINK_WEBHOOK" if linked_action else "RAZORPAY_ORIGINAL_LINK_RETRY_WEBHOOK",
+                successful_payment_id=successful_payment.get("id"),
+                payment_link_id=link_id,
             )
         webhook_event.processed = True
         db.commit()
@@ -1064,7 +1108,14 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
             journey = db.query(RecoveryJourney).filter(RecoveryJourney.payment_id == payment.id).first()
             if journey:
                 source = "RAZORPAY_PAYMENT_CAPTURED_WEBHOOK" if entity.get("id") == payment.id else "RAZORPAY_ORIGINAL_LINK_RETRY_CAPTURED"
-                mark_recovery_completed(db, payment, journey, source)
+                mark_recovery_completed(
+                    db,
+                    payment,
+                    journey,
+                    source,
+                    successful_payment_id=entity.get("id"),
+                    payment_link_id=entity.get("payment_link_id"),
+                )
         webhook_event.processed = True
         db.commit()
     return {"status": "ok"}

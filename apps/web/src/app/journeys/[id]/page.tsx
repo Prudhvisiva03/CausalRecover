@@ -73,6 +73,9 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
   const selected = candidates?.find((c: any) => c.is_selected);
   const noAction = candidates?.find((c: any) => c.action_type === "NO_ACTION");
   const isRecovered = journey?.status === "RECOVERED" || payment.status === "recovered";
+  const recoveryAudit = (audit_trail || []).find((a: any) => a.event_type === "PAYMENT_RECOVERED");
+  const successfulPaymentId = recoveryAudit?.metadata?.successful_payment_id;
+  const recoveredPaymentLinkId = recoveryAudit?.metadata?.payment_link_id;
   const isTestModeRecovery = journey?.resolution === "RAZORPAY_API_RECONCILIATION" || payment.failure_code?.startsWith("TEST_MODE_");
   const paymentContext = [payment.customer_id ? `Customer: ${payment.customer_id}` : null, payment.order_id ? `Order: ${payment.order_id}` : null].filter(Boolean).join(" • ");
 
@@ -142,6 +145,8 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
                 The recovery payment completed and was verified through Razorpay API reconciliation{journey?.resolved_at ? ` on ${formatApiDate(journey.resolved_at)}` : ""}.
                 {isTestModeRecovery && " This is a Razorpay Test Mode verification, not a live settlement."}
               </p>
+              {successfulPaymentId && <p className="mt-3 break-all text-sm font-semibold text-emerald-950">Successful retry payment: {successfulPaymentId}</p>}
+              {recoveredPaymentLinkId && <p className="mt-1 break-all text-xs text-emerald-800">Razorpay Payment Link: {recoveredPaymentLinkId}</p>}
             </div>
           </div>
         </div>
@@ -355,6 +360,8 @@ export default function JourneyDetail({ params }: { params: Promise<{ id: string
                     {a.new_state && <span className={`rounded-full px-2 py-0.5 font-semibold ${a.new_state === 'WAITING' ? 'bg-blue-50 text-blue-700' : a.new_state === 'ACTION_PENDING' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{readable(a.new_state)}</span>}
                   </div>
                   {a.reason && <p className="mt-2 max-w-4xl text-sm leading-5 text-[#515978]">{displayAuditReason(a.reason)}</p>}
+                  {a.metadata?.successful_payment_id && <p className="mt-1 break-all text-xs font-semibold text-emerald-700">Successful retry payment: {a.metadata.successful_payment_id}</p>}
+                  {a.metadata?.payment_link_id && <p className="mt-1 break-all text-xs text-[#515978]">Razorpay Payment Link: {a.metadata.payment_link_id}</p>}
                 </div>
               </div>
             ))}
