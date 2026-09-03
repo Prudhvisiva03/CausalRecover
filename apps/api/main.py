@@ -63,6 +63,21 @@ def customer_context(customer: Customer | None, payment: Payment, journey: Recov
     }
 
 
+def model_feature_context(customer: Customer | None, payment: Payment) -> dict:
+    """Pass recorded merchant history to the offline scorer when it exists."""
+    if not customer:
+        return {}
+    return {
+        "customer_tenure_days": customer.customer_tenure_days,
+        "historical_upi_success_rate": customer.historical_upi_success_rate,
+        "historical_card_success_rate": customer.historical_card_success_rate,
+        "previous_failures": customer.previous_failures,
+        "is_repeat_customer": int(bool(customer.is_repeat_customer)),
+        "previous_recovery_contacts": customer.previous_recovery_contacts,
+        "contact_consent": int(bool(customer.contact_consent)),
+    }
+
+
 def experiment_arm(experiment: Experiment, payment_id: str) -> str:
     """Stable  allocation: retries never move a payment between experiment arms."""
     bucket = int(hashlib.sha256(f"{experiment.id}:{payment_id}".encode()).hexdigest()[:8], 16) % 10000
@@ -72,7 +87,13 @@ def experiment_arm(experiment: Experiment, payment_id: str) -> str:
 def evaluate_and_queue_recovery(db: Session, payment: Payment, journey: RecoveryJourney, customer: Customer | None):
     """Evaluate all actions, persist the decision, and queue only a bounded action."""
     candidates = evaluate_transaction(
-        payment.amount, payment.failure_category, customer.historical_success_rate if customer else 0.5
+        payment.amount,
+        payment.failure_category,
+        customer.historical_success_rate if customer else 0.5,
+        payment_method=payment.method,
+        failure_source=payment.failure_source,
+        event_time=payment.created_at,
+        customer_features=model_feature_context(customer, payment),
     )
     policies = merchant_policy_map(db)
     context = customer_context(customer, payment, journey)
@@ -520,7 +541,12 @@ class SimulatorRequest(BaseModel):
 
 @app.post("/api/simulator/evaluate")
 def simulate_evaluation(req: SimulatorRequest, db: Session = Depends(get_db)):
-    candidates = evaluate_transaction(req.amount, req.failure_category, req.historical_success_rate)
+    candidates = evaluate_transaction(
+        req.amount,
+        req.failure_category,
+        req.historical_success_rate,
+        payment_method=req.payment_method,
+    )
     
     customer_context = {"contact_consent": req.contact_consent, "payment_amount": req.amount, "previous_recovery_contacts": 0, "attempt_count": 0}
     policies = merchant_policy_map(db)
@@ -548,8 +574,8 @@ def simulate_evaluation(req: SimulatorRequest, db: Session = Depends(get_db)):
     return {
         "candidates": candidates,
         "selected_action": selected,
-        "natural_recovery_prob": candidates[-1]["probability"] if candidates else 0,
-        "label": "MODEL_ESTIMATE — No money action executed.",
+        "natural_recovery_prob": next((c["probability"] for c in candidates if c["action_type"] == "NO_ACTION"), 0),
+        "label": "OFFLINE MODEL ESTIMATE — No money action executed; this is not a production causal claim.",
     }
 
 # ══════════════════════════════════════════════════════════════
@@ -776,8 +802,8 @@ def get_experiments(db: Session = Depends(get_db)):
             "treatment_recovery_rate": round(treatment_rate, 4),
             "control_recovery_rate": round(control_rate, 4),
             "observed_lift_pp": round((treatment_rate - control_rate) * 100, 2),
-            "measurement_label": "EXPERIMENTAL MEASUREMENT — benchmarked against a control baseline",
-            "data_source": "OFFLINE_SEEDED_BENCHMARK",
+            "measurement_label": "RECORDED EXPERIMENT SUMMARY — effect requires sufficient live randomized outcomes and statistical review",
+            "data_source": "RECORDED_EXPERIMENT_ASSIGNMENTS",
             "started_at": e.started_at.isoformat() if e.started_at else None,
         })
     return {"experiments": results}
@@ -807,8 +833,8 @@ def get_experiment_evidence(db: Session = Depends(get_db)):
         "treatment": treatment,
         "minimum_per_arm": minimum_per_arm,
         "ready_for_effect_evaluation": ready,
-        "claim_status": "READY_FOR_CONFIDENCE_INTERVAL_EVALUATION" if ready else "COLLECTING_LIVE_RANDOMIZED_OUTCOMES",
-        "message": "Live randomized outcomes are required before estimating merchant impact. Test Mode outcomes remain operational verification only.",
+        "claim_status": "SUFFICIENT_SAMPLE_COUNT_FOR_REVIEW" if ready else "COLLECTING_LIVE_RANDOMIZED_OUTCOMES",
+        "message": "Live randomized outcomes are required before estimating merchant impact. Meeting the sample threshold enables review; it does not by itself prove a causal effect. Test Mode outcomes remain operational verification only.",
     }
 
 # ══════════════════════════════════════════════════════════════
@@ -930,9 +956,23 @@ def get_model_info():
             "dataset_size": metric.get("samples_train", card["train_size"]),
             "test_size": metric.get("samples_test", card["test_size"]),
             "features": card["features"], "trained_at": "2026-08-31", "status": "OFFLINE_VALIDATION",
-            "roc_auc": metric.get("roc_auc"), "brier_score": metric.get("brier_score"),
+            "roc_auc": metric.get("roc_auc"), "pr_auc": metric.get("pr_auc"),
+            "brier_score": metric.get("brier_score"), "accuracy": metric.get("accuracy"),
         })
-    return {"models": models, "limitations": " ".join(card["known_limitations"]), "dataset_label": "OFFLINE VALIDATION"}
+    return {
+        "models": models,
+        "limitations": card["known_limitations"],
+        "dataset_label": "SEMI-SYNTHETIC / OFFLINE VALIDATION",
+        "runtime_inputs": [
+            "Razorpay payment amount", "normalized failure category", "payment method",
+            "failure source", "provider event timestamp", "merchant history when available",
+        ],
+        "imputed_inputs": [
+            "issuer category", "average order value", "bank health score",
+            "previous attempts", "days since last contact",
+        ],
+        "runtime_note": "The scorer uses provider inputs and recorded merchant history when present. Features not supplied by the current integration use fixed neutral defaults, so outputs are offline model estimates rather than live causal proof.",
+    }
 
 # ══════════════════════════════════════════════════════════════
 # WEBHOOK RECEIVER (Razorpay Integration)

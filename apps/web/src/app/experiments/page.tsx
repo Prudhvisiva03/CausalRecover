@@ -25,7 +25,7 @@ export default function ExperimentsPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className={`text-xs font-bold uppercase tracking-wider ${evidence.ready_for_effect_evaluation ? "text-emerald-700" : "text-amber-700"}`}>Causal evidence gate</p>
-              <h3 className="mt-1 text-lg font-bold text-[#02042B]">{evidence.ready_for_effect_evaluation ? "Ready for confidence-interval evaluation" : "Collecting live randomized outcomes"}</h3>
+              <h3 className="mt-1 text-lg font-bold text-[#02042B]">{evidence.ready_for_effect_evaluation ? "Sufficient sample count for statistical review" : "Collecting live randomized outcomes"}</h3>
               <p className="mt-1 max-w-3xl text-sm text-[#515978]">{evidence.message}</p>
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#515978] shadow-sm">Provider mode: {evidence.source_mode}</span>
@@ -58,7 +58,7 @@ export default function ExperimentsPage() {
                   <h3 className="text-lg font-bold text-[#02042B]">{exp.name}</h3>
                   <p className="text-sm text-[#515978] mt-1">{exp.description}</p>
                 </div>
-                <div className="flex flex-wrap justify-end gap-2"><span className="px-3 py-1 rounded-full bg-slate-100 text-xs font-bold text-slate-600">Offline benchmark</span><span className={`px-3 py-1 rounded-full text-xs font-bold ${exp.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-[#F4F5F8] text-[#515978]'}`}>{exp.status}</span></div>
+                <div className="flex flex-wrap justify-end gap-2"><span className="px-3 py-1 rounded-full bg-slate-100 text-xs font-bold text-slate-600">Recorded assignments</span><span className={`px-3 py-1 rounded-full text-xs font-bold ${exp.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-[#F4F5F8] text-[#515978]'}`}>{exp.status}</span></div>
               </div>
             </div>
 

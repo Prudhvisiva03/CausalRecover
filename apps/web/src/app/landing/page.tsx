@@ -51,7 +51,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-lg md:text-xl text-[#515978] max-w-2xl font-medium tracking-tight mb-10 leading-relaxed">
-          Stop optimizing for gross recovery. CausalRecover computes the exact intervention that creates the highest <strong className="text-[#02042B]">net incremental value</strong>, leaving natural recoveries untouched.
+          Stop optimizing for gross recovery. CausalRecover uses an offline uplift model to <strong className="text-[#02042B]">estimate and rank net incremental value</strong>, while verified outcomes and experiments establish what happened in reality.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -74,8 +74,8 @@ export default function LandingPage() {
             <p className="text-xs font-extrabold tracking-widest uppercase text-[#FF424E] mb-3">The Industry Flaw</p>
             <h3 className="text-3xl font-extrabold text-[#02042B] tracking-tight mb-4">Optimizing for the inevitable.</h3>
             <p className="text-[#515978] text-base font-medium leading-relaxed max-w-md">
-              Most AI recovery systems measure <code className="bg-[#F4F5F8] px-1.5 py-0.5 rounded text-[#02042B] border border-[#E4E6EA] mx-1">P(pay | action)</code>. 
-              They spend resources nudging customers who were already going to pay, inflating success metrics while wasting merchant margins.
+              Many recovery workflows measure <code className="bg-[#F4F5F8] px-1.5 py-0.5 rounded text-[#02042B] border border-[#E4E6EA] mx-1">P(pay | action)</code>.
+              That can spend resources on customers who might have paid anyway, making gross recovery look better than incremental impact.
             </p>
           </div>
 
@@ -87,7 +87,7 @@ export default function LandingPage() {
             </div>
             <h3 className="text-2xl font-extrabold text-[#02042B] tracking-tight mb-3">True Incrementality</h3>
             <p className="text-[#515978] text-sm font-medium leading-relaxed">
-              We isolate causal impact: <code className="block mt-3 bg-[#F4F5F8] p-2.5 rounded text-xs text-[#00D27A] border border-[#E4E6EA] font-bold">Uplift = P(pay|action) - P(pay|no_action)</code>
+              Our offline model estimates incremental potential: <code className="block mt-3 bg-[#F4F5F8] p-2.5 rounded text-xs text-[#00D27A] border border-[#E4E6EA] font-bold">Estimated uplift = P(pay|action) - P(pay|no_action)</code>
             </p>
           </div>
 
@@ -99,12 +99,12 @@ export default function LandingPage() {
               </div>
               <h3 className="text-3xl font-extrabold text-[#02042B] tracking-tight mb-4">The Economic Optimizer</h3>
               <p className="text-[#515978] text-base font-medium leading-relaxed max-w-sm mb-8">
-                CausalRecover ranks every possible intervention by its net incremental financial value, ensuring no action is taken unless it justifies its cost.
+                CausalRecover ranks possible interventions by estimated net incremental value; policy rules can still block every action.
               </p>
               <ul className="space-y-4">
                 {[
                   "Deterministic policy guardrails (Cost/Consent limits)",
-                  "LightGBM T-Learner uplift models",
+                  "Offline LightGBM T-Learner estimates",
                   "Treats NO_ACTION as a valid economic baseline"
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-sm font-bold text-[#02042B]">
@@ -125,7 +125,7 @@ export default function LandingPage() {
                 <div className="w-2.5 h-2.5 rounded-full bg-[#00D27A]"></div>
               </div>
 
-              <div className="text-white/30 mb-4">/* Causal Optimization Engine */</div>
+              <div className="text-white/30 mb-4">/* Illustrative optimizer logic — not a live outcome */</div>
               <div><span className="text-[#3366FF] font-bold">const</span> <span className="text-white">evaluateIntervention</span> = (payment) =&gt; {'{'}</div>
               <div className="pl-4">
                 <span className="text-[#3366FF] font-bold">const</span> baseProb = model.predict(payment, <span className="text-[#00D27A]">'NO_ACTION'</span>);
@@ -149,8 +149,8 @@ export default function LandingPage() {
               <div>{'}'}</div>
               
               <div className="mt-8 p-3.5 rounded-lg bg-[#00D27A]/10 border border-[#00D27A]/30 text-[#00D27A] font-bold">
-                &gt; Execution selected: ALTERNATIVE_PAYMENT_METHOD<br />
-                &gt; Expected Incremental Net: ₹2,097.40
+                &gt; Output: offline model estimate<br />
+                &gt; Dispatch requires policy approval and provider verification
               </div>
             </div>
           </div>
@@ -163,14 +163,14 @@ export default function LandingPage() {
         <div className="mx-auto mb-12 max-w-2xl text-center">
           <p className="text-xs font-extrabold uppercase tracking-widest text-[#3366FF]">Recovery engine</p>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[#02042B] md:text-4xl">From payment failure to verified outcome.</h2>
-          <p className="mt-4 text-base font-medium leading-relaxed text-[#515978]">Every decision is measurable, policy-bound, and visible to the merchant.</p>
+          <p className="mt-4 text-base font-medium leading-relaxed text-[#515978]">Every decision is recorded, policy-bound, and visible to the merchant.</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           {[
             { step: "01", title: "Detect", text: "Razorpay webhook captures a failed payment and its provider reason.", icon: Webhook },
-            { step: "02", title: "Decide", text: "AI compares no action with recovery options using net incremental value.", icon: Activity },
+            { step: "02", title: "Decide", text: "Offline AI estimates no action and recovery options using net incremental value.", icon: Activity },
             { step: "03", title: "Approve", text: "Merchant policies and the Action Queue keep every workflow bounded.", icon: ShieldCheck },
-            { step: "04", title: "Verify", text: "Razorpay Test Mode outcomes update the journey and immutable audit timeline.", icon: CheckCircle2 },
+            { step: "04", title: "Verify", text: "Razorpay Test Mode outcomes update the journey and recorded audit timeline.", icon: CheckCircle2 },
           ].map((item, index) => { const Icon = item.icon; return <div key={item.step} className="relative rounded-2xl border border-[#E4E6EA] bg-white p-6 shadow-sm"><div className="mb-8 flex items-center justify-between"><span className="text-xs font-extrabold text-[#3366FF]">{item.step}</span><Icon className="h-5 w-5 text-[#3366FF]" /></div><h3 className="text-lg font-extrabold text-[#02042B]">{item.title}</h3><p className="mt-2 text-sm font-medium leading-relaxed text-[#515978]">{item.text}</p>{index < 3 && <ArrowRight className="absolute -right-7 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 text-[#3366FF] md:block" />}</div>})}
         </div>
       </section>

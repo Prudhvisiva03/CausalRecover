@@ -2,6 +2,7 @@ import joblib
 import os
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 # Load models and encoders lazily
 _models = {}
@@ -27,8 +28,25 @@ def _load_ml_assets():
     except Exception as e:
         print(f"Warning: ML models not found. Using fallback heuristics. {e}")
 
-def evaluate_transaction(amount: float, failure_category: str, historical_success_rate: float = 0.5):
+def evaluate_transaction(
+    amount: float,
+    failure_category: str,
+    historical_success_rate: float = 0.5,
+    payment_method: str = "card",
+    failure_source: str = "unknown",
+    event_time: datetime | None = None,
+    customer_features: dict | None = None,
+):
+    """Return offline model estimates using only recorded inputs plus explicit imputation.
+
+    The model was trained on semi-synthetic data and expects more features than a
+    standard Razorpay failure webhook supplies. Missing merchant-history fields
+    receive fixed neutral values; callers must not treat the result as proven
+    causal impact.
+    """
     _load_ml_assets()
+    customer_features = customer_features or {}
+    event_time = event_time or datetime.utcnow()
     
     # Costs
     action_costs = {
@@ -58,27 +76,33 @@ def evaluate_transaction(amount: float, failure_category: str, historical_succes
         le = _encoders[encoder_name]
         return le.transform([value])[0] if value in le.classes_ else 0
 
+    def value(name, fallback):
+        observed = customer_features.get(name)
+        return fallback if observed is None else observed
+
     feature_dict = {
         "amount": amount,
         "failure_category_enc": safe_encode("failure_category", failure_category),
-        "payment_method_enc": safe_encode("payment_method", "card"),
-        "issuer_category_enc": safe_encode("issuer_category", "HDFC"),
-        "failure_source_enc": safe_encode("failure_source", "issuer"),
-        "hour_of_day": 14,
-        "day_of_week": 2,
-        "customer_tenure_days": 180,
-        "previous_attempts": 1,
+        "payment_method_enc": safe_encode("payment_method", payment_method),
+        # Razorpay's bank name is not the synthetic training taxonomy; OTHER is
+        # safer than silently mapping an unknown issuer to the first label.
+        "issuer_category_enc": safe_encode("issuer_category", "OTHER"),
+        "failure_source_enc": safe_encode("failure_source", failure_source),
+        "hour_of_day": event_time.hour,
+        "day_of_week": event_time.weekday(),
+        "customer_tenure_days": value("customer_tenure_days", 180),
+        "previous_attempts": value("previous_attempts", 0),
         "historical_success_rate": historical_success_rate,
-        "historical_upi_success_rate": max(historical_success_rate, 0.6),
-        "historical_card_success_rate": historical_success_rate,
-        "previous_failures": 2,
-        "average_order_value": amount * 1.2,
-        "bank_health_score": 0.8,
-        "is_repeat_customer": 1,
-        "time_since_failure_minutes": 5,
-        "previous_recovery_contacts": 1,
-        "contact_consent": 1,
-        "days_since_last_contact": 10,
+        "historical_upi_success_rate": value("historical_upi_success_rate", historical_success_rate),
+        "historical_card_success_rate": value("historical_card_success_rate", historical_success_rate),
+        "previous_failures": value("previous_failures", 0),
+        "average_order_value": value("average_order_value", amount),
+        "bank_health_score": value("bank_health_score", 0.5),
+        "is_repeat_customer": value("is_repeat_customer", 0),
+        "time_since_failure_minutes": value("time_since_failure_minutes", 0),
+        "previous_recovery_contacts": value("previous_recovery_contacts", 0),
+        "contact_consent": value("contact_consent", 0),
+        "days_since_last_contact": value("days_since_last_contact", 14),
     }
     
     X_input = pd.DataFrame([feature_dict])[ _feature_cols ]
